@@ -219,7 +219,11 @@ docker-compose up -d
 
 ### Future Features
 - [ ] Lending system with due dates and reminders
+- [ ] reading status: "read", "Currently Reading", "Want to Read", "Finished", or "Library Only"
+- [ ] start / end date of reading -> statistics books per month, average pages per day.
+- [ ] book / music suggestions?
 - [ ] MusicBrainz integration for music metadata
+- [ ] RBAC (simple admin / reader)
 - [ ] Mobile app (iOS/Android)? (browser works fine for now)
 
 ## License
