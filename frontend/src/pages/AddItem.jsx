@@ -33,6 +33,7 @@ export default function AddItem() {
     jellyfin_id: '',
     jellyfin_url: '',
     comicvine_id: '',
+    wishlist: false,
   });
   const [creatorInput, setCreatorInput] = useState({ name: '', role: 'author' });
   const [tagInput, setTagInput] = useState('');
@@ -827,6 +828,20 @@ export default function AddItem() {
               className="input"
               placeholder="Personal notes about this item..."
             />
+          </div>
+
+          <div className="flex items-center">
+            <input
+              type="checkbox"
+              id="wishlist"
+              name="wishlist"
+              checked={formData.wishlist}
+              onChange={(e) => setFormData({ ...formData, wishlist: e.target.checked })}
+              className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+            />
+            <label htmlFor="wishlist" className="ml-2 text-sm font-medium text-gray-900 dark:text-gray-300">
+              Add to Wishlist (item not yet owned)
+            </label>
           </div>
         </div>
 

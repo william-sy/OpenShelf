@@ -47,6 +47,8 @@ export function initializeDatabase() {
       jellyfin_id TEXT, -- Jellyfin ID for linking to media server
       jellyfin_url TEXT, -- Direct playback URL in Jellyfin
       file_path TEXT, -- Path to ebook file for digital books
+      comicvine_id TEXT, -- Comic Vine ID for comics
+      wishlist BOOLEAN DEFAULT 0, -- Mark items as wishlist items
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
@@ -197,7 +199,8 @@ export function initializeDatabase() {
     { name: 'jellyfin_id', type: 'TEXT', sql: 'ALTER TABLE items ADD COLUMN jellyfin_id TEXT' },
     { name: 'jellyfin_url', type: 'TEXT', sql: 'ALTER TABLE items ADD COLUMN jellyfin_url TEXT' },
     { name: 'file_path', type: 'TEXT', sql: 'ALTER TABLE items ADD COLUMN file_path TEXT' },
-    { name: 'comicvine_id', type: 'TEXT', sql: 'ALTER TABLE items ADD COLUMN comicvine_id TEXT' }
+    { name: 'comicvine_id', type: 'TEXT', sql: 'ALTER TABLE items ADD COLUMN comicvine_id TEXT' },
+    { name: 'wishlist', type: 'BOOLEAN', sql: 'ALTER TABLE items ADD COLUMN wishlist BOOLEAN DEFAULT 0' }
   ];
 
   for (const col of newColumns) {

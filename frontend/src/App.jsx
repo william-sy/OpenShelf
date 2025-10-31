@@ -12,6 +12,8 @@ import ItemList from './pages/ItemList';
 import AddItem from './pages/AddItem';
 import EditItem from './pages/EditItem';
 import ItemDetail from './pages/ItemDetail';
+import Wishlist from './pages/Wishlist';
+import Statistics from './pages/Statistics';
 import Settings from './pages/Settings';
 
 // Components
@@ -50,6 +52,8 @@ function App() {
           <Route path="items/add" element={<AddItem />} />
           <Route path="items/:id" element={<ItemDetail />} />
           <Route path="items/:id/edit" element={<EditItem />} />
+          <Route path="wishlist" element={<Wishlist />} />
+          <Route path="statistics" element={<Statistics />} />
           <Route path="settings" element={<Settings />} />
         </Route>
       </Routes>

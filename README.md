@@ -14,6 +14,10 @@ A modern, self-hosted library management system for your physical media collecti
 - 📱 **Barcode Scanner** - Use your device camera or upload barcode photos for quick ISBN lookup
 - 🎬 **TMDB Integration** - Automatic movie and TV show metadata lookup for video media
 - 🎵 **Jellyfin Integration** - Connect to your Jellyfin media server to link and play media directly
+- ❤️ **Wishlist** - Track items you want to acquire with dedicated wishlist management
+- 📊 **Statistics & Insights** - Visual analytics with charts showing collection trends, top creators, and more
+- 💾 **Import/Export** - Backup and restore your collection data in CSV or JSON format
+- 🔍 **Advanced Search & Filters** - Multi-parameter filtering including tags, ratings, dates, and more
 - 🎨 **Modern UI** - Clean, responsive interface built with React and Tailwind CSS
 - 🌙 **Dark Mode** - Full dark mode support with persistent theme preference
 - 👥 **User Management** - Multi-user support with authentication and display names
@@ -189,15 +193,15 @@ VITE_API_URL=http://localhost:3001
 - [x] Modern responsive UI
 - [x] Docker deployment
 - [x] Mobile-friendly access
+- [x] Import/Export functionality (CSV, JSON)
+- [x] Statistics and collection insights with visual charts
+- [x] Wishlist feature for tracking items to acquire
+- [x] Advanced search and filters (multi-parameter, date ranges, ratings)
 
 ### Future Features
-- [ ] Lending system with due dates and reminders?
+- [ ] Lending system with due dates and reminders
 - [ ] MusicBrainz integration for music metadata
-- [ ] Import/Export functionality (CSV, JSON)
-- [ ] Statistics and collection insights
-- [ ] Wishlist feature
-- [ ] Advanced search and filters
-- [ ] Collection value tracking
+- [ ] Mobile app (iOS/Android)? (browser works fine for now)
 
 ## License
 

@@ -3,6 +3,8 @@ import { useAuthStore } from '../store/authStore';
 import { 
   FiHome, 
   FiBook, 
+  FiHeart,
+  FiTrendingUp,
   FiSettings, 
   FiLogOut, 
   FiMenu,
@@ -24,6 +26,8 @@ export default function Layout() {
   const navigation = [
     { name: 'Dashboard', href: '/', icon: FiHome },
     { name: 'Library', href: '/items', icon: FiBook },
+    { name: 'Wishlist', href: '/wishlist', icon: FiHeart },
+    { name: 'Statistics', href: '/statistics', icon: FiTrendingUp },
     { name: 'Settings', href: '/settings', icon: FiSettings },
   ];
 

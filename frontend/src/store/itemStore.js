@@ -8,6 +8,7 @@ export const useItemStore = create((set, get) => ({
   filter: {
     type: '',
     search: '',
+    wishlist: null, // null = all, true = wishlist only, false = owned only
   },
 
   setFilter: (filter) => {
@@ -17,10 +18,11 @@ export const useItemStore = create((set, get) => ({
   fetchItems: async () => {
     set({ loading: true, error: null });
     try {
-      const { type, search } = get().filter;
+      const { type, search, wishlist } = get().filter;
       const params = new URLSearchParams();
       if (type) params.append('type', type);
       if (search) params.append('search', search);
+      if (wishlist !== null) params.append('wishlist', wishlist);
 
       const response = await api.get(`/api/items?${params.toString()}`);
       set({ items: response.data, loading: false });

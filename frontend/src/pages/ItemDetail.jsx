@@ -2,13 +2,13 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useItemStore } from '../store/itemStore';
 import toast from 'react-hot-toast';
-import { FiEdit2, FiTrash2, FiArrowLeft, FiCalendar, FiBook, FiMapPin, FiStar } from 'react-icons/fi';
+import { FiEdit2, FiTrash2, FiArrowLeft, FiCalendar, FiBook, FiMapPin, FiStar, FiHeart } from 'react-icons/fi';
 
 export default function ItemDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const getItemById = useItemStore((state) => state.getItemById);
-  const { deleteItem, fetchItems } = useItemStore();
+  const { deleteItem, updateItem, fetchItems } = useItemStore();
   const [item, setItem] = useState(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
@@ -31,6 +31,17 @@ export default function ItemDetail() {
       navigate('/items');
     } catch (error) {
       toast.error('Failed to delete item');
+    }
+  };
+
+  const handleWishlistToggle = async () => {
+    try {
+      const updatedItem = { ...item, wishlist: !item.wishlist };
+      await updateItem(parseInt(id), updatedItem);
+      setItem(updatedItem);
+      toast.success(updatedItem.wishlist ? 'Added to wishlist' : 'Removed from wishlist');
+    } catch (error) {
+      toast.error('Failed to update wishlist');
     }
   };
 
@@ -70,9 +81,17 @@ export default function ItemDetail() {
           {/* Details */}
           <div className="md:w-2/3 space-y-4">
             <div>
-              <span className="inline-block px-3 py-1 bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400 text-sm rounded-full capitalize mb-2">
-                {item.type}
-              </span>
+              <div className="flex items-center gap-2 mb-2">
+                <span className="inline-block px-3 py-1 bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400 text-sm rounded-full capitalize">
+                  {item.type}
+                </span>
+                {item.wishlist && (
+                  <span className="inline-flex items-center gap-1 px-3 py-1 bg-pink-100 dark:bg-pink-900/30 text-pink-700 dark:text-pink-400 text-sm rounded-full">
+                    <FiHeart className="w-3 h-3 fill-current" />
+                    Wishlist
+                  </span>
+                )}
+              </div>
               <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">{item.title}</h1>
               {item.subtitle && (
                 <p className="text-xl text-gray-600 dark:text-gray-400 mt-1">{item.subtitle}</p>
@@ -169,6 +188,13 @@ export default function ItemDetail() {
 
             {/* Actions */}
             <div className="flex gap-3 pt-4">
+              <button
+                onClick={handleWishlistToggle}
+                className={`btn ${item.wishlist ? 'btn-secondary' : 'btn-primary'} flex items-center gap-2`}
+              >
+                <FiHeart className={`inline ${item.wishlist ? 'fill-current' : ''}`} />
+                {item.wishlist ? 'Remove from Wishlist' : 'Add to Wishlist'}
+              </button>
               <Link to={`/items/${id}/edit`} className="btn btn-primary flex-1">
                 <FiEdit2 className="inline mr-2" />
                 Edit
