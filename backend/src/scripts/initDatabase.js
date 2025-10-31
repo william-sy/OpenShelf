@@ -247,11 +247,18 @@ export function initializeDatabase() {
   // Add comicvine_api_key column to existing api_settings table if needed
   const apiSettingsTableInfo = db.prepare("PRAGMA table_info(api_settings)").all();
   const hasComicVineKey = apiSettingsTableInfo.some(col => col.name === 'comicvine_api_key');
+  const hasCurrency = apiSettingsTableInfo.some(col => col.name === 'currency');
   
   if (apiSettingsTableInfo.length > 0 && !hasComicVineKey) {
     console.log('🔄 Adding comicvine_api_key column to api_settings table...');
     db.exec(`ALTER TABLE api_settings ADD COLUMN comicvine_api_key TEXT`);
     console.log('✅ comicvine_api_key column added');
+  }
+  
+  if (apiSettingsTableInfo.length > 0 && !hasCurrency) {
+    console.log('🔄 Adding currency column to api_settings table...');
+    db.exec(`ALTER TABLE api_settings ADD COLUMN currency TEXT DEFAULT 'USD'`);
+    console.log('✅ currency column added');
   }
 
   // Create indexes for better performance

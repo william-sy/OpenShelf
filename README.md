@@ -122,11 +122,17 @@ The easiest way to configure API keys is through the **Settings page** in the we
 
 ### Environment Variables (Alternative)
 
-You can also set default API keys via environment variables in the backend `.env` file. User-configured keys in Settings will take priority over these defaults.
+You can also set default API keys via environment variables. Create a `.env` file in the project root:
+
+```bash
+# Copy the example file
+cp .env.example .env
+```
+
+Available environment variables:
 
 ```env
-# Server
-PORT=3001
+# Backend Configuration
 JWT_SECRET=your-secret-key-change-this
 DATABASE_PATH=./database/openshelf.db
 
@@ -135,11 +141,24 @@ TMDB_API_KEY=your_tmdb_api_key_here
 JELLYFIN_URL=http://your-jellyfin-server:8096
 JELLYFIN_API_KEY=your_jellyfin_api_key_here
 COMICVINE_API_KEY=your_comicvine_api_key_here
+
+# Frontend Configuration
+# Leave empty for automatic detection (localhost, LAN IP)
+# Set for production behind reverse proxy (e.g., https://your-domain.com)
+VITE_API_URL=
 ```
 
-Frontend `.env` file:
-```env
-VITE_API_URL=http://localhost:3001
+**Note:** When `VITE_API_URL` is empty, the frontend automatically detects the API URL based on the current hostname. This works for:
+- Local development (`http://localhost:3001`)
+- LAN access (`http://192.168.1.100:3001`)
+- Custom domains with dynamic API detection
+
+Set `VITE_API_URL` when deploying behind a reverse proxy (nginx, Caddy, etc.) where the API is served from the same domain.
+
+After modifying `.env`, rebuild the containers:
+```bash
+docker-compose build
+docker-compose up -d
 ```
 
 ### Getting API Keys

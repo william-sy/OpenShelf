@@ -33,7 +33,7 @@ export default function Settings() {
   });
 
   useEffect(() => {
-    // Load API settings on component mount
+    // Load API settings and currency on component mount
     const loadApiSettings = async () => {
       try {
         const response = await api.get('/api/settings/apis');
@@ -46,12 +46,16 @@ export default function Settings() {
           jellyfin_api_key: response.data.jellyfin_api_key ? '••••••••••••••••' : '',
           comicvine_api_key: response.data.comicvine_api_key ? '••••••••••••••••' : '',
         });
+        // Load currency
+        if (response.data.currency) {
+          setCurrency(response.data.currency);
+        }
       } catch (error) {
         console.error('Failed to load API settings:', error);
       }
     };
     loadApiSettings();
-  }, []);
+  }, [setCurrency]);
 
   const handlePasswordChange = async (e) => {
     e.preventDefault();

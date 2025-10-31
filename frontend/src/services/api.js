@@ -11,6 +11,13 @@ const getApiUrl = () => {
   // Otherwise, use the same host as the frontend but on port 3001
   const protocol = window.location.protocol;
   const hostname = window.location.hostname;
+  
+  // If running on production domain, use same origin (nginx proxy handles routing)
+  if (hostname === 'books.stelling19.nl') {
+    return `${protocol}//${hostname}`;
+  }
+  
+  // Development: direct connection to backend port
   return `${protocol}//${hostname}:3001`;
 };
 

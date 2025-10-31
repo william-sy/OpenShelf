@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { useAuthStore } from './store/authStore';
 import { useThemeStore } from './store/themeStore';
+import { useCurrencyStore } from './store/currencyStore';
 import { useEffect } from 'react';
 
 // Pages
@@ -26,11 +27,15 @@ function ProtectedRoute({ children }) {
 
 function App() {
   const initTheme = useThemeStore((state) => state.initTheme);
+  const loadCurrency = useCurrencyStore((state) => state.loadCurrency);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 
   useEffect(() => {
-    // Initialize theme on app load
     initTheme();
-  }, [initTheme]);
+    if (isAuthenticated) {
+      loadCurrency();
+    }
+  }, [initTheme, loadCurrency, isAuthenticated]);
 
   return (
     <BrowserRouter>

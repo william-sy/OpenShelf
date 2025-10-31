@@ -30,6 +30,10 @@ export const ApiSettings = {
         updates.push('comicvine_api_key = ?');
         values.push(settingsData.comicvine_api_key || null);
       }
+      if (settingsData.currency !== undefined) {
+        updates.push('currency = ?');
+        values.push(settingsData.currency || 'USD');
+      }
       
       if (updates.length === 0) return existing;
       
@@ -47,8 +51,8 @@ export const ApiSettings = {
     } else {
       // Insert new settings
       const stmt = db.prepare(`
-        INSERT INTO api_settings (user_id, tmdb_api_key, jellyfin_url, jellyfin_api_key, comicvine_api_key)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO api_settings (user_id, tmdb_api_key, jellyfin_url, jellyfin_api_key, comicvine_api_key, currency)
+        VALUES (?, ?, ?, ?, ?, ?)
       `);
       
       stmt.run(
@@ -56,7 +60,8 @@ export const ApiSettings = {
         settingsData.tmdb_api_key || null,
         settingsData.jellyfin_url || null,
         settingsData.jellyfin_api_key || null,
-        settingsData.comicvine_api_key || null
+        settingsData.comicvine_api_key || null,
+        settingsData.currency || 'USD'
       );
       
       return this.findByUserId(userId);
