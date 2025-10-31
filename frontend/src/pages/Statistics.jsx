@@ -4,6 +4,7 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
 } from 'recharts';
 import { FiTrendingUp, FiDollarSign, FiPackage, FiHeart, FiAward } from 'react-icons/fi';
+import { useCurrencyStore } from '../store/currencyStore';
 import api from '../services/api';
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
@@ -11,6 +12,7 @@ const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'
 export default function Statistics() {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
+  const { formatPrice } = useCurrencyStore();
 
   useEffect(() => {
     fetchStats();
@@ -106,7 +108,7 @@ export default function Statistics() {
             <div>
               <p className="text-sm text-gray-600 dark:text-gray-400">Total Value</p>
               <p className="text-3xl font-bold text-gray-900 dark:text-gray-100 mt-1">
-                ${stats.totalValue.toFixed(2)}
+                {formatPrice(stats.totalValue)}
               </p>
             </div>
             <div className="w-12 h-12 bg-green-100 dark:bg-green-900/30 rounded-lg flex items-center justify-center">

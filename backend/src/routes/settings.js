@@ -16,14 +16,16 @@ router.get('/apis', async (req, res) => {
       return res.json({
         tmdb_api_key: '',
         jellyfin_url: '',
-        jellyfin_api_key: ''
+        jellyfin_api_key: '',
+        comicvine_api_key: ''
       });
     }
     
     res.json({
       tmdb_api_key: settings.tmdb_api_key || '',
       jellyfin_url: settings.jellyfin_url || '',
-      jellyfin_api_key: settings.jellyfin_api_key || ''
+      jellyfin_api_key: settings.jellyfin_api_key || '',
+      comicvine_api_key: settings.comicvine_api_key || ''
     });
   } catch (error) {
     console.error('Error fetching API settings:', error);
@@ -34,12 +36,13 @@ router.get('/apis', async (req, res) => {
 // Update user's API settings
 router.put('/apis', async (req, res) => {
   try {
-    const { tmdb_api_key, jellyfin_url, jellyfin_api_key } = req.body;
+    const { tmdb_api_key, jellyfin_url, jellyfin_api_key, comicvine_api_key } = req.body;
     
     const settings = ApiSettings.upsert(req.user.id, {
       tmdb_api_key,
       jellyfin_url,
-      jellyfin_api_key
+      jellyfin_api_key,
+      comicvine_api_key
     });
     
     res.json({
@@ -47,7 +50,8 @@ router.put('/apis', async (req, res) => {
       settings: {
         tmdb_api_key: settings.tmdb_api_key || '',
         jellyfin_url: settings.jellyfin_url || '',
-        jellyfin_api_key: settings.jellyfin_api_key || ''
+        jellyfin_api_key: settings.jellyfin_api_key || '',
+        comicvine_api_key: settings.comicvine_api_key || ''
       }
     });
   } catch (error) {

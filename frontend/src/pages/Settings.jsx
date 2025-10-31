@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react';
 import { useAuthStore } from '../store/authStore';
 import { useThemeStore } from '../store/themeStore';
+import { useCurrencyStore } from '../store/currencyStore';
 import toast from 'react-hot-toast';
 import api from '../services/api';
-import { FiUser, FiMail, FiLock, FiSave, FiMoon, FiSun, FiKey } from 'react-icons/fi';
+import { FiUser, FiMail, FiLock, FiSave, FiMoon, FiSun, FiKey, FiCheck, FiDollarSign } from 'react-icons/fi';
 
 export default function Settings() {
   const { user, updateUser } = useAuthStore();
   const { isDark, toggleTheme } = useThemeStore();
+  const { currencyCode, setCurrency } = useCurrencyStore();
   const [passwords, setPasswords] = useState({
     currentPassword: '',
     newPassword: '',
@@ -23,13 +25,27 @@ export default function Settings() {
     jellyfin_api_key: '',
     comicvine_api_key: '',
   });
+  const [originalApiSettings, setOriginalApiSettings] = useState({
+    tmdb_api_key: '',
+    jellyfin_url: '',
+    jellyfin_api_key: '',
+    comicvine_api_key: '',
+  });
 
   useEffect(() => {
     // Load API settings on component mount
     const loadApiSettings = async () => {
       try {
         const response = await api.get('/api/settings/apis');
-        setApiSettings(response.data);
+        // Store original keys to check if they're set
+        setOriginalApiSettings(response.data);
+        // Show placeholder for existing keys
+        setApiSettings({
+          tmdb_api_key: response.data.tmdb_api_key ? '••••••••••••••••' : '',
+          jellyfin_url: response.data.jellyfin_url || '',
+          jellyfin_api_key: response.data.jellyfin_api_key ? '••••••••••••••••' : '',
+          comicvine_api_key: response.data.comicvine_api_key ? '••••••••••••••••' : '',
+        });
       } catch (error) {
         console.error('Failed to load API settings:', error);
       }
@@ -89,8 +105,26 @@ export default function Settings() {
     e.preventDefault();
     setSavingApiSettings(true);
     try {
-      await api.put('/api/settings/apis', apiSettings);
+      // Only send keys that have been modified (not the placeholder)
+      const updatedSettings = {
+        tmdb_api_key: apiSettings.tmdb_api_key === '••••••••••••••••' ? originalApiSettings.tmdb_api_key : apiSettings.tmdb_api_key,
+        jellyfin_url: apiSettings.jellyfin_url,
+        jellyfin_api_key: apiSettings.jellyfin_api_key === '••••••••••••••••' ? originalApiSettings.jellyfin_api_key : apiSettings.jellyfin_api_key,
+        comicvine_api_key: apiSettings.comicvine_api_key === '••••••••••••••••' ? originalApiSettings.comicvine_api_key : apiSettings.comicvine_api_key,
+      };
+      
+      await api.put('/api/settings/apis', updatedSettings);
       toast.success('API settings updated successfully');
+      
+      // Reload to show updated placeholders
+      const response = await api.get('/api/settings/apis');
+      setOriginalApiSettings(response.data);
+      setApiSettings({
+        tmdb_api_key: response.data.tmdb_api_key ? '••••••••••••••••' : '',
+        jellyfin_url: response.data.jellyfin_url || '',
+        jellyfin_api_key: response.data.jellyfin_api_key ? '••••••••••••••••' : '',
+        comicvine_api_key: response.data.comicvine_api_key ? '••••••••••••••••' : '',
+      });
     } catch (error) {
       toast.error(error.response?.data?.error || 'Failed to update API settings');
     } finally {
@@ -133,6 +167,37 @@ export default function Settings() {
               }`}
             />
           </button>
+        </div>
+      </div>
+
+      {/* Currency Settings */}
+      <div className="card">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <FiDollarSign className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+            <div>
+              <p className="font-medium text-gray-900 dark:text-gray-100">Currency</p>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Select your preferred currency for prices
+              </p>
+            </div>
+          </div>
+          <select
+            value={currencyCode}
+            onChange={(e) => {
+              setCurrency(e.target.value);
+              toast.success(`Currency changed to ${e.target.value}`);
+            }}
+            className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+          >
+            <option value="USD">$ USD</option>
+            <option value="EUR">€ EUR</option>
+            <option value="GBP">£ GBP</option>
+            <option value="JPY">¥ JPY</option>
+            <option value="CAD">C$ CAD</option>
+            <option value="AUD">A$ AUD</option>
+            <option value="CHF">CHF CHF</option>
+          </select>
         </div>
       </div>
 
@@ -207,13 +272,21 @@ export default function Settings() {
 
           <div>
             <label className="label">TMDB API Key</label>
-            <input
-              type="password"
-              value={apiSettings.tmdb_api_key}
-              onChange={(e) => setApiSettings({ ...apiSettings, tmdb_api_key: e.target.value })}
-              className="input"
-              placeholder="Your TMDB API key for movie/TV metadata"
-            />
+            <div className="relative">
+              <input
+                type="password"
+                value={apiSettings.tmdb_api_key}
+                onChange={(e) => setApiSettings({ ...apiSettings, tmdb_api_key: e.target.value })}
+                className="input pr-10"
+                placeholder="Your TMDB API key for movie/TV metadata"
+              />
+              {originalApiSettings.tmdb_api_key && (
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 text-green-600 dark:text-green-400">
+                  <FiCheck className="w-4 h-4" />
+                  <span className="text-xs font-medium">Set</span>
+                </div>
+              )}
+            </div>
             <p className="mt-1 text-xs text-gray-600 dark:text-gray-400">
               Get your API key at{' '}
               <a
@@ -243,13 +316,21 @@ export default function Settings() {
 
           <div>
             <label className="label">Jellyfin API Key</label>
-            <input
-              type="password"
-              value={apiSettings.jellyfin_api_key}
-              onChange={(e) => setApiSettings({ ...apiSettings, jellyfin_api_key: e.target.value })}
-              className="input"
-              placeholder="Your Jellyfin API key"
-            />
+            <div className="relative">
+              <input
+                type="password"
+                value={apiSettings.jellyfin_api_key}
+                onChange={(e) => setApiSettings({ ...apiSettings, jellyfin_api_key: e.target.value })}
+                className="input pr-10"
+                placeholder="Your Jellyfin API key"
+              />
+              {originalApiSettings.jellyfin_api_key && (
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 text-green-600 dark:text-green-400">
+                  <FiCheck className="w-4 h-4" />
+                  <span className="text-xs font-medium">Set</span>
+                </div>
+              )}
+            </div>
             <p className="mt-1 text-xs text-gray-600 dark:text-gray-400">
               Generate an API key in your Jellyfin Dashboard → API Keys section
             </p>
@@ -257,13 +338,21 @@ export default function Settings() {
 
           <div>
             <label className="label">Comic Vine API Key</label>
-            <input
-              type="password"
-              value={apiSettings.comicvine_api_key}
-              onChange={(e) => setApiSettings({ ...apiSettings, comicvine_api_key: e.target.value })}
-              className="input"
-              placeholder="Your Comic Vine API key"
-            />
+            <div className="relative">
+              <input
+                type="password"
+                value={apiSettings.comicvine_api_key}
+                onChange={(e) => setApiSettings({ ...apiSettings, comicvine_api_key: e.target.value })}
+                className="input pr-10"
+                placeholder="Your Comic Vine API key"
+              />
+              {originalApiSettings.comicvine_api_key && (
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 text-green-600 dark:text-green-400">
+                  <FiCheck className="w-4 h-4" />
+                  <span className="text-xs font-medium">Set</span>
+                </div>
+              )}
+            </div>
             <p className="mt-1 text-xs text-gray-600 dark:text-gray-400">
               Get your free API key at{' '}
               <a

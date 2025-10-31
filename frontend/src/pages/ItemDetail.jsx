@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useItemStore } from '../store/itemStore';
+import { useCurrencyStore } from '../store/currencyStore';
 import toast from 'react-hot-toast';
 import { FiEdit2, FiTrash2, FiArrowLeft, FiCalendar, FiBook, FiMapPin, FiStar, FiHeart } from 'react-icons/fi';
 
@@ -8,6 +9,7 @@ export default function ItemDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const getItemById = useItemStore((state) => state.getItemById);
+  const { formatPrice } = useCurrencyStore();
   const { deleteItem, updateItem, fetchItems } = useItemStore();
   const [item, setItem] = useState(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -85,12 +87,12 @@ export default function ItemDetail() {
                 <span className="inline-block px-3 py-1 bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400 text-sm rounded-full capitalize">
                   {item.type}
                 </span>
-                {item.wishlist && (
+                {item.wishlist ? (
                   <span className="inline-flex items-center gap-1 px-3 py-1 bg-pink-100 dark:bg-pink-900/30 text-pink-700 dark:text-pink-400 text-sm rounded-full">
                     <FiHeart className="w-3 h-3 fill-current" />
                     Wishlist
                   </span>
-                )}
+                ) : null}
               </div>
               <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">{item.title}</h1>
               {item.subtitle && (
@@ -164,6 +166,22 @@ export default function ItemDetail() {
                   <p className="font-medium flex items-center gap-1 text-gray-900 dark:text-gray-100">
                     <FiMapPin className="w-4 h-4" />
                     {item.location}
+                  </p>
+                </div>
+              )}
+              {item.purchase_date && (
+                <div>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Purchase Date</p>
+                  <p className="font-medium text-gray-900 dark:text-gray-100">
+                    {item.purchase_date}
+                  </p>
+                </div>
+              )}
+              {item.purchase_price && (
+                <div>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Purchase Price</p>
+                  <p className="font-medium text-gray-900 dark:text-gray-100">
+                    {formatPrice(parseFloat(item.purchase_price))}
                   </p>
                 </div>
               )}

@@ -130,6 +130,7 @@ router.put('/:id', (req, res) => {
       return res.status(403).json({ error: 'Access denied' });
     }
 
+    console.log('Updating item:', req.params.id, 'with data:', req.body);
     const success = Item.update(req.params.id, req.body);
     
     if (!success) {
@@ -140,7 +141,8 @@ router.put('/:id', (req, res) => {
     res.json(updatedItem);
   } catch (error) {
     console.error('Error updating item:', error);
-    res.status(500).json({ error: 'Failed to update item' });
+    console.error('Error stack:', error.stack);
+    res.status(500).json({ error: 'Failed to update item', message: error.message });
   }
 });
 
@@ -255,7 +257,10 @@ router.post('/import', upload.single('file'), (req, res) => {
         // Parse numeric fields
         page_count: item.page_count ? parseInt(item.page_count) : null,
         rating: item.rating ? parseInt(item.rating) : null,
-        purchase_price: item.purchase_price ? parseFloat(item.purchase_price) : null
+        purchase_price: item.purchase_price ? parseFloat(item.purchase_price) : null,
+        // Ensure date fields are properly formatted
+        purchase_date: item.purchase_date || null,
+        publish_date: item.publish_date || null
       }));
     } else {
       return res.status(400).json({ error: 'Unsupported file format. Use CSV or JSON.' });

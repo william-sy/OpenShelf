@@ -146,9 +146,16 @@ export default function Wishlist() {
                 </div>
 
                 <div className="p-4">
-                  <span className="inline-block px-2 py-1 bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400 text-xs rounded-full capitalize mb-2">
-                    {item.type}
-                  </span>
+                  <div className="flex flex-wrap gap-1 mb-2">
+                    <span className="inline-block px-2 py-1 bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400 text-xs rounded-full capitalize">
+                      {item.type}
+                    </span>
+                    {item.tags?.find(tag => tag.startsWith('Series: ')) && (
+                      <span className="inline-block px-2 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 text-xs rounded-full">
+                        {item.tags.find(tag => tag.startsWith('Series: ')).replace('Series: ', '')}
+                      </span>
+                    )}
+                  </div>
                   <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-1 group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors line-clamp-2">
                     {item.title}
                   </h3>

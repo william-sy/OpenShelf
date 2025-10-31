@@ -164,11 +164,11 @@ export const Item = {
       });
     }
 
-    // Full-text search (title, creators, isbn, barcode, description)
+    // Full-text search (title, creators, isbn, barcode, description, tags)
     if (filters.search) {
-      query += ' AND (title LIKE ? OR creators LIKE ? OR isbn LIKE ? OR barcode LIKE ? OR description LIKE ?)';
+      query += ' AND (title LIKE ? OR creators LIKE ? OR isbn LIKE ? OR barcode LIKE ? OR description LIKE ? OR tags LIKE ?)';
       const searchTerm = `%${filters.search}%`;
-      params.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
+      params.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
     }
 
     // Sorting
@@ -218,7 +218,7 @@ export const Item = {
 
   update(id, itemData) {
     const allowed = [
-      'type', 'title', 'subtitle', 'creators', 'authors', 'isbn', 'barcode', 'publisher',
+      'type', 'title', 'subtitle', 'creators', 'isbn', 'barcode', 'publisher',
       'publish_date', 'description', 'cover_url', 'page_count', 'language',
       'metadata', 'notes', 'tags', 'rating', 'condition', 'location',
       'purchase_date', 'purchase_price', 'tmdb_id', 'jellyfin_id', 'jellyfin_url', 'file_path',
@@ -234,6 +234,12 @@ export const Item = {
         // Stringify arrays and objects
         if (key === 'creators' || key === 'authors' || key === 'tags' || key === 'metadata') {
           values.push(value ? JSON.stringify(value) : null);
+        } else if (key === 'wishlist') {
+          // Convert to boolean (0 or 1)
+          values.push(value ? 1 : 0);
+        } else if (value === '' || value === undefined) {
+          // Convert empty strings to null
+          values.push(null);
         } else {
           values.push(value);
         }
@@ -243,12 +249,20 @@ export const Item = {
     if (updates.length === 0) return false;
 
     values.push(id);
-    const stmt = db.prepare(`
-      UPDATE items 
-      SET ${updates.join(', ')}, updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?
-    `);
-    return stmt.run(...values).changes > 0;
+    
+    try {
+      const stmt = db.prepare(`
+        UPDATE items 
+        SET ${updates.join(', ')}, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `);
+      return stmt.run(...values).changes > 0;
+    } catch (error) {
+      console.error('Database update error:', error);
+      console.error('Updates:', updates);
+      console.error('Values:', values);
+      throw error;
+    }
   },
 
   delete(id) {

@@ -21,6 +21,15 @@ export default function ItemList() {
     setFilter({ search: searchInput });
   };
 
+  const handleTagClick = (tag) => {
+    // Add tag to search if not already included
+    if (!searchInput.includes(tag)) {
+      const newSearch = searchInput ? `${searchInput} ${tag}` : tag;
+      setSearchInput(newSearch);
+      setFilter({ search: newSearch });
+    }
+  };
+
   const handleTypeFilter = (type) => {
     setFilter({ type: type === filter.type ? '' : type });
   };
@@ -147,7 +156,7 @@ export default function ItemList() {
                 type="text"
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
-                placeholder="Search by title, author, or ISBN..."
+                placeholder="Search library... (click tags below to add)"
                 className="input pl-10"
               />
             </div>
@@ -247,9 +256,28 @@ export default function ItemList() {
               <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-1 mb-2">
                 {item.authors?.join(', ') || 'Unknown'}
               </p>
-              <span className="inline-block px-2 py-1 bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400 text-xs rounded">
-                {item.type}
-              </span>
+              <div className="flex flex-wrap gap-1">
+                <span className="inline-block px-2 py-1 bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400 text-xs rounded">
+                  {item.type}
+                </span>
+                {item.tags?.map((tag, index) => (
+                  <button
+                    key={index}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      handleTagClick(tag);
+                    }}
+                    className={`inline-block px-2 py-1 text-xs rounded transition-colors hover:opacity-80 ${
+                      tag.startsWith('Series: ')
+                        ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400'
+                        : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
+                    }`}
+                    title="Click to add to search"
+                  >
+                    {tag.startsWith('Series: ') ? tag.replace('Series: ', '') : tag}
+                  </button>
+                ))}
+              </div>
             </Link>
           ))}
         </div>

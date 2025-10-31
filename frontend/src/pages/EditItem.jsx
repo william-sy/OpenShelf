@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useItemStore } from '../store/itemStore';
+import { useCurrencyStore } from '../store/currencyStore';
 import toast from 'react-hot-toast';
 import { FiX } from 'react-icons/fi';
 import api from '../services/api';
@@ -9,6 +10,7 @@ export default function EditItem() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { getItemById, updateItem, fetchItems } = useItemStore();
+  const { currencyCode } = useCurrencyStore();
   const [formData, setFormData] = useState(null);
   const [creatorInput, setCreatorInput] = useState({ name: '', role: 'author' });
   const [tagInput, setTagInput] = useState('');
@@ -37,6 +39,8 @@ export default function EditItem() {
           creators: item.creators || [],
           page_count: item.page_count || '',
           rating: item.rating || '',
+          purchase_date: item.purchase_date || '',
+          purchase_price: item.purchase_price || '',
         });
       } else {
         toast.error('Item not found');
@@ -120,6 +124,7 @@ export default function EditItem() {
         ...formData,
         page_count: formData.page_count ? parseInt(formData.page_count) : null,
         rating: formData.rating ? parseInt(formData.rating) : null,
+        purchase_price: formData.purchase_price ? parseFloat(formData.purchase_price) : null,
       };
 
       await updateItem(parseInt(id), itemData);
@@ -336,26 +341,150 @@ export default function EditItem() {
             />
           </div>
 
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="label">Purchase Date (YYYY-MM-DD)</label>
+              <input
+                type="text"
+                name="purchase_date"
+                value={formData.purchase_date || ''}
+                onChange={handleChange}
+                placeholder="YYYY-MM-DD"
+                pattern="\d{4}-\d{2}-\d{2}"
+                className="input"
+              />
+            </div>
+
+            <div>
+              <label className="label">Purchase Price ({currencyCode})</label>
+              <div className="relative">
+                <input
+                  type="number"
+                  name="purchase_price"
+                  value={formData.purchase_price || ''}
+                  onChange={handleChange}
+                  placeholder="0.00"
+                  step="0.01"
+                  min="0"
+                  className="input"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Series field for comics */}
+          {formData.type === 'comic' && (
+            <div>
+              <label className="label">Series Name</label>
+              <input
+                type="text"
+                value={(formData.tags || []).find(tag => tag.startsWith('Series: '))?.replace('Series: ', '') || ''}
+                onChange={(e) => {
+                  const seriesName = e.target.value;
+                  // Remove any existing series tag
+                  const otherTags = (formData.tags || []).filter(tag => !tag.startsWith('Series: '));
+                  // Add new series tag if not empty
+                  if (seriesName.trim()) {
+                    setFormData({
+                      ...formData,
+                      tags: [...otherTags, `Series: ${seriesName}`]
+                    });
+                  } else {
+                    setFormData({
+                      ...formData,
+                      tags: otherTags
+                    });
+                  }
+                }}
+                placeholder="e.g., Asterix, Batman, Spider-Man"
+                className="input"
+              />
+              <p className="mt-1 text-xs text-gray-600 dark:text-gray-400">
+                This will be added as a "Series: {'{name}'}" tag for easy filtering
+              </p>
+            </div>
+          )}
+
           <div>
             <label className="label">Tags</label>
+            
+            {/* Quick Tag Suggestions */}
+            <div className="mb-3">
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Quick Add:</p>
+              <div className="flex flex-wrap gap-2">
+                {/* Language Tags */}
+                {['English', 'Dutch', 'French', 'German', 'Spanish', 'Italian', 'Japanese'].map(lang => (
+                  <button
+                    key={lang}
+                    type="button"
+                    onClick={() => {
+                      if (!(formData.tags || []).includes(lang)) {
+                        setFormData({ ...formData, tags: [...(formData.tags || []), lang] });
+                        toast.success(`Added ${lang} tag`);
+                      }
+                    }}
+                    className={`px-2 py-1 text-xs rounded-full transition-colors ${
+                      (formData.tags || []).includes(lang)
+                        ? 'bg-blue-500 text-white cursor-not-allowed'
+                        : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-blue-100 dark:hover:bg-blue-900'
+                    }`}
+                    disabled={(formData.tags || []).includes(lang)}
+                  >
+                    {lang} {(formData.tags || []).includes(lang) ? '✓' : null}
+                  </button>
+                ))}
+              </div>
+              
+              <div className="flex flex-wrap gap-2 mt-2">
+                {/* Genre/Category Tags */}
+                {['Fiction', 'Non-Fiction', 'Biography', 'Science Fiction', 'Fantasy', 'Mystery', 'Horror', 'Romance', 'Thriller', 'Comedy', 'Drama', 'Action'].map(genre => (
+                  <button
+                    key={genre}
+                    type="button"
+                    onClick={() => {
+                      if (!(formData.tags || []).includes(genre)) {
+                        setFormData({ ...formData, tags: [...(formData.tags || []), genre] });
+                        toast.success(`Added ${genre} tag`);
+                      }
+                    }}
+                    className={`px-2 py-1 text-xs rounded-full transition-colors ${
+                      (formData.tags || []).includes(genre)
+                        ? 'bg-green-500 text-white cursor-not-allowed'
+                        : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-green-100 dark:hover:bg-green-900'
+                    }`}
+                    disabled={(formData.tags || []).includes(genre)}
+                  >
+                    {genre} {(formData.tags || []).includes(genre) ? '✓' : null}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Custom Tag Input */}
             <div className="flex gap-2 mb-2">
               <input
                 type="text"
                 value={tagInput}
                 onChange={(e) => setTagInput(e.target.value)}
                 onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addTag())}
-                placeholder="Add tag and press Enter"
+                placeholder="Add custom tag and press Enter"
                 className="input flex-1"
               />
               <button type="button" onClick={addTag} className="btn btn-secondary">
                 Add
               </button>
             </div>
+            
+            {/* Selected Tags */}
             <div className="flex flex-wrap gap-2">
               {(formData.tags || []).map((tag, index) => (
                 <span
                   key={index}
-                  className="inline-flex items-center gap-1 px-3 py-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-full text-sm"
+                  className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm ${
+                    tag.startsWith('Series: ')
+                      ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400'
+                      : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
+                  }`}
                 >
                   {tag}
                   <button

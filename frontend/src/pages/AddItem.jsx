@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useItemStore } from '../store/itemStore';
+import { useCurrencyStore } from '../store/currencyStore';
 import toast from 'react-hot-toast';
 import { FiSearch, FiCamera, FiX } from 'react-icons/fi';
 import ISBNScanner from '../components/ISBNScanner';
@@ -9,6 +10,7 @@ import api from '../services/api';
 export default function AddItem() {
   const navigate = useNavigate();
   const { addItem, lookupISBN } = useItemStore();
+  const { currencyCode } = useCurrencyStore();
   const [showScanner, setShowScanner] = useState(false);
   const [formData, setFormData] = useState({
     type: 'book',
@@ -29,6 +31,8 @@ export default function AddItem() {
     rating: '',
     condition: '',
     location: '',
+    purchase_date: '',
+    purchase_price: '',
     tmdb_id: '',
     jellyfin_id: '',
     jellyfin_url: '',
@@ -46,6 +50,8 @@ export default function AddItem() {
   const [showJellyfinResults, setShowJellyfinResults] = useState(false);
   const [showComicVineResults, setShowComicVineResults] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [comicVineFilter, setComicVineFilter] = useState('all'); // 'all', 'issues', 'volumes'
+  const [comicVineSortBy, setComicVineSortBy] = useState('relevance'); // 'relevance', 'year', 'title'
 
   const creatorRoles = [
     { value: 'author', label: 'Author' },
@@ -112,7 +118,8 @@ export default function AddItem() {
         creators,
         authors: result.data.authors || [],
       });
-      toast.success(`Found: ${result.data.title}`);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      toast.success(`Found: ${result.data.title}. Review the details and click "Add Item" to save.`, { duration: 5000 });
     } catch (error) {
       console.error('ISBN lookup failed:', error);
       toast.error('ISBN lookup failed - book data not found. Please enter details manually.', { 
@@ -139,7 +146,8 @@ export default function AddItem() {
         creators,
         authors: result.data.authors || [],
       });
-      toast.success(`Found: ${result.data.title}`);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      toast.success(`Found: ${result.data.title}. Review the details and click "Add Item" to save.`, { duration: 5000 });
     } catch (error) {
       console.error('ISBN lookup failed:', error);
       // Just set the ISBN and let user fill in details manually
@@ -197,7 +205,8 @@ export default function AddItem() {
       });
       setShowTmdbResults(false);
       setSearchQuery('');
-      toast.success(`Loaded: ${data.title}`);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      toast.success(`Loaded: ${data.title}. Review the details and click "Add Item" to save.`, { duration: 5000 });
     } catch (error) {
       console.error('TMDB details failed:', error);
       toast.error('Failed to load movie details');
@@ -243,7 +252,8 @@ export default function AddItem() {
     });
     setShowJellyfinResults(false);
     setSearchQuery('');
-    toast.success(`Linked to Jellyfin: ${result.title}`);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    toast.success(`Linked to Jellyfin: ${result.title}. Review the details and click "Add Item" to save.`, { duration: 5000 });
   };
 
   const handleComicVineSearch = async () => {
@@ -269,11 +279,48 @@ export default function AddItem() {
     }
   };
 
+  // Filter and sort Comic Vine results
+  const getFilteredComicVineResults = () => {
+    let filtered = [...comicVineResults];
+    
+    // Apply filter
+    if (comicVineFilter === 'issues') {
+      filtered = filtered.filter(r => r.resource_type === 'issue');
+    } else if (comicVineFilter === 'volumes') {
+      filtered = filtered.filter(r => r.resource_type === 'volume');
+    }
+    
+    // Apply sort
+    if (comicVineSortBy === 'year') {
+      filtered.sort((a, b) => {
+        const yearA = a.year || 0;
+        const yearB = b.year || 0;
+        return yearB - yearA; // Newest first
+      });
+    } else if (comicVineSortBy === 'title') {
+      filtered.sort((a, b) => a.title.localeCompare(b.title));
+    }
+    // 'relevance' keeps the original order from the API
+    
+    return filtered;
+  };
+
   const handleComicVineSelect = async (result) => {
     setLookingUp(true);
     try {
-      const response = await api.get(`/api/lookup/comicvine/volume/${result.comicvine_id}`);
+      const response = await api.get(`/api/lookup/comicvine/volume/${result.comicvine_id}`, {
+        params: {
+          type: result.resource_type || 'volume'
+        }
+      });
       const data = response.data.data;
+      
+      // Extract series name from metadata if available
+      const seriesName = data.metadata?.volume_name;
+      const tags = [...(data.tags || [])];
+      if (seriesName && !tags.some(tag => tag.startsWith('Series: '))) {
+        tags.push(`Series: ${seriesName}`);
+      }
       
       setFormData({
         ...formData,
@@ -285,15 +332,19 @@ export default function AddItem() {
         publisher: data.publisher || '',
         creators: data.creators || [],
         comicvine_id: data.comicvine_id,
-        tags: data.tags || [],
+        tags: tags,
         page_count: data.page_count || '',
       });
       setShowComicVineResults(false);
       setSearchQuery('');
-      toast.success(`Loaded: ${data.title}`);
+      
+      // Scroll to top of form so user can review the loaded data
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      
+      toast.success(`Loaded: ${data.title}. Review the details below and click "Add Item" to save.`, { duration: 5000 });
     } catch (error) {
       console.error('Comic Vine details failed:', error);
-      toast.error('Failed to load comic details');
+      toast.error(error.response?.data?.message || 'Failed to load comic details');
     } finally {
       setLookingUp(false);
     }
@@ -343,6 +394,7 @@ export default function AddItem() {
         ...formData,
         page_count: formData.page_count ? parseInt(formData.page_count) : null,
         rating: formData.rating ? parseInt(formData.rating) : null,
+        purchase_price: formData.purchase_price ? parseFloat(formData.purchase_price) : null,
       };
 
       await addItem(itemData);
@@ -784,32 +836,156 @@ export default function AddItem() {
             />
           </div>
 
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="label">Purchase Date (YYYY-MM-DD)</label>
+              <input
+                type="text"
+                name="purchase_date"
+                value={formData.purchase_date}
+                onChange={handleChange}
+                placeholder="YYYY-MM-DD"
+                pattern="\d{4}-\d{2}-\d{2}"
+                className="input"
+              />
+            </div>
+
+            <div>
+              <label className="label">Purchase Price ({currencyCode})</label>
+              <div className="relative">
+                <input
+                  type="number"
+                  name="purchase_price"
+                  value={formData.purchase_price}
+                  onChange={handleChange}
+                  placeholder="0.00"
+                  step="0.01"
+                  min="0"
+                  className="input"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Series field for comics */}
+          {formData.type === 'comic' && (
+            <div>
+              <label className="label">Series Name</label>
+              <input
+                type="text"
+                value={formData.tags.find(tag => tag.startsWith('Series: '))?.replace('Series: ', '') || ''}
+                onChange={(e) => {
+                  const seriesName = e.target.value;
+                  // Remove any existing series tag
+                  const otherTags = formData.tags.filter(tag => !tag.startsWith('Series: '));
+                  // Add new series tag if not empty
+                  if (seriesName.trim()) {
+                    setFormData({
+                      ...formData,
+                      tags: [...otherTags, `Series: ${seriesName}`]
+                    });
+                  } else {
+                    setFormData({
+                      ...formData,
+                      tags: otherTags
+                    });
+                  }
+                }}
+                placeholder="e.g., Asterix, Batman, Spider-Man"
+                className="input"
+              />
+              <p className="mt-1 text-xs text-gray-600 dark:text-gray-400">
+                This will be added as a "Series: {'{name}'}" tag for easy filtering
+              </p>
+            </div>
+          )}
+
           <div>
             <label className="label">Tags</label>
+            
+            {/* Quick Tag Suggestions */}
+            <div className="mb-3">
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Quick Add:</p>
+              <div className="flex flex-wrap gap-2">
+                {/* Language Tags */}
+                {['English', 'Dutch', 'French', 'German', 'Spanish', 'Italian', 'Japanese'].map(lang => (
+                  <button
+                    key={lang}
+                    type="button"
+                    onClick={() => {
+                      if (!formData.tags.includes(lang)) {
+                        setFormData({ ...formData, tags: [...formData.tags, lang] });
+                        toast.success(`Added ${lang} tag`);
+                      }
+                    }}
+                    className={`px-2 py-1 text-xs rounded-full transition-colors ${
+                      formData.tags.includes(lang)
+                        ? 'bg-blue-500 text-white cursor-not-allowed'
+                        : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-blue-100 dark:hover:bg-blue-900'
+                    }`}
+                    disabled={formData.tags.includes(lang)}
+                  >
+                    {lang} {formData.tags.includes(lang) ? '✓' : null}
+                  </button>
+                ))}
+              </div>
+              
+              <div className="flex flex-wrap gap-2 mt-2">
+                {/* Genre/Category Tags */}
+                {['Fiction', 'Non-Fiction', 'Biography', 'Science Fiction', 'Fantasy', 'Mystery', 'Horror', 'Romance', 'Thriller', 'Comedy', 'Drama', 'Action'].map(genre => (
+                  <button
+                    key={genre}
+                    type="button"
+                    onClick={() => {
+                      if (!formData.tags.includes(genre)) {
+                        setFormData({ ...formData, tags: [...formData.tags, genre] });
+                        toast.success(`Added ${genre} tag`);
+                      }
+                    }}
+                    className={`px-2 py-1 text-xs rounded-full transition-colors ${
+                      formData.tags.includes(genre)
+                        ? 'bg-green-500 text-white cursor-not-allowed'
+                        : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-green-100 dark:hover:bg-green-900'
+                    }`}
+                    disabled={formData.tags.includes(genre)}
+                  >
+                    {genre} {formData.tags.includes(genre) ? '✓' : null}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Custom Tag Input */}
             <div className="flex gap-2 mb-2">
               <input
                 type="text"
                 value={tagInput}
                 onChange={(e) => setTagInput(e.target.value)}
                 onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addTag())}
-                placeholder="Add tag and press Enter"
+                placeholder="Add custom tag and press Enter"
                 className="input flex-1"
               />
               <button type="button" onClick={addTag} className="btn btn-secondary">
                 Add
               </button>
             </div>
+            
+            {/* Selected Tags */}
             <div className="flex flex-wrap gap-2">
               {formData.tags.map((tag, index) => (
                 <span
                   key={index}
-                  className="inline-flex items-center gap-1 px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm"
+                  className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm ${
+                    tag.startsWith('Series: ')
+                      ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400'
+                      : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
+                  }`}
                 >
                   {tag}
                   <button
                     type="button"
                     onClick={() => removeTag(index)}
-                    className="hover:text-gray-900 dark:hover:text-gray-100 dark:text-gray-100"
+                    className="hover:text-gray-900 dark:hover:text-gray-100"
                   >
                     <FiX className="w-4 h-4" />
                   </button>
@@ -978,9 +1154,11 @@ export default function AddItem() {
       {/* Comic Vine Search Results Modal */}
       {showComicVineResults && (
         <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-4xl w-full max-h-[85vh] overflow-hidden flex flex-col">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100">Comic Vine Search Results</h3>
+              <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100">
+                Comic Vine Search Results ({getFilteredComicVineResults().length})
+              </h3>
               <button
                 onClick={() => setShowComicVineResults(false)}
                 className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
@@ -989,46 +1167,92 @@ export default function AddItem() {
               </button>
             </div>
 
-            {comicVineResults.length === 0 ? (
-              <p className="text-gray-600 dark:text-gray-400 text-center py-8">
-                No results found. Try a different search term.
-              </p>
-            ) : (
-              <div className="space-y-3">
-                {comicVineResults.map((result) => (
-                  <button
-                    key={result.comicvine_id}
-                    onClick={() => handleComicVineSelect(result)}
-                    className="w-full flex gap-4 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors text-left"
-                  >
-                    {result.cover_url && (
-                      <img
-                        src={result.cover_url}
-                        alt={result.title}
-                        className="w-16 h-24 object-cover rounded"
-                      />
-                    )}
-                    <div className="flex-1">
-                      <h4 className="font-semibold text-gray-900 dark:text-gray-100">{result.title}</h4>
-                      {result.publisher && (
-                        <p className="text-sm text-gray-600 dark:text-gray-400">{result.publisher}</p>
-                      )}
-                      {result.year && (
-                        <p className="text-sm text-gray-600 dark:text-gray-400">Started: {result.year}</p>
-                      )}
-                      {result.issue_count && (
-                        <p className="text-sm text-gray-600 dark:text-gray-400">{result.issue_count} issues</p>
-                      )}
-                      {result.description && (
-                        <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-2 mt-1">
-                          {result.description}
-                        </p>
-                      )}
-                    </div>
-                  </button>
-                ))}
+            {/* Filter and Sort Controls */}
+            <div className="flex flex-wrap gap-3 mb-4 pb-4 border-b border-gray-200 dark:border-gray-700">
+              <div className="flex items-center gap-2">
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Show:</label>
+                <select
+                  value={comicVineFilter}
+                  onChange={(e) => setComicVineFilter(e.target.value)}
+                  className="px-3 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                >
+                  <option value="all">All Results</option>
+                  <option value="issues">Issues Only</option>
+                  <option value="volumes">Series Only</option>
+                </select>
               </div>
-            )}
+              
+              <div className="flex items-center gap-2">
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Sort by:</label>
+                <select
+                  value={comicVineSortBy}
+                  onChange={(e) => setComicVineSortBy(e.target.value)}
+                  className="px-3 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                >
+                  <option value="relevance">Relevance</option>
+                  <option value="year">Year (Newest)</option>
+                  <option value="title">Title (A-Z)</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Results List */}
+            <div className="overflow-y-auto flex-1">
+              {getFilteredComicVineResults().length === 0 ? (
+                <p className="text-gray-600 dark:text-gray-400 text-center py-8">
+                  {comicVineResults.length === 0 
+                    ? 'No results found. Try a different search term.'
+                    : 'No results match the current filter.'}
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {getFilteredComicVineResults().map((result) => (
+                    <button
+                      key={result.comicvine_id}
+                      onClick={() => handleComicVineSelect(result)}
+                      className="w-full flex gap-4 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors text-left"
+                    >
+                      {result.cover_url && (
+                        <img
+                          src={result.cover_url}
+                          alt={result.title}
+                          className="w-16 h-24 object-cover rounded flex-shrink-0"
+                        />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start gap-2 mb-1">
+                          <h4 className="font-semibold text-gray-900 dark:text-gray-100 flex-1">
+                            {result.title}
+                          </h4>
+                          {result.resource_type && (
+                            <span className={`px-2 py-0.5 text-xs font-medium rounded flex-shrink-0 ${
+                              result.resource_type === 'issue'
+                                ? 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200'
+                                : 'bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200'
+                            }`}>
+                              {result.resource_type === 'issue' ? 'Issue' : 'Series'}
+                            </span>
+                          )}
+                        </div>
+                        {result.subtitle && (
+                          <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">{result.subtitle}</p>
+                        )}
+                        <div className="flex flex-wrap gap-3 text-sm text-gray-600 dark:text-gray-400">
+                          {result.publisher && <span>📚 {result.publisher}</span>}
+                          {result.year && <span>📅 {result.year}</span>}
+                          {result.issue_count && <span>📖 {result.issue_count} issues</span>}
+                        </div>
+                        {result.description && (
+                          <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-2 mt-2">
+                            {result.description.replace(/<[^>]*>/g, '')}
+                          </p>
+                        )}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

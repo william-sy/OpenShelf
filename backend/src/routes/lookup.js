@@ -395,24 +395,27 @@ router.get('/comicvine/search', async (req, res) => {
     const userSettings = getUserApiSettings(req.user.id);
     
     if (!userSettings.comicvine_api_key) {
-      return res.status(503).json({ 
+      return res.status(400).json({ 
         error: 'Comic Vine not configured',
         message: 'Please configure your Comic Vine API key in Settings. Get one at https://comicvine.gamespot.com/api/'
       });
     }
 
+    console.log(`Comic Vine search request for: "${q}"`);
+    
     const response = await axios.get(`${COMICVINE_BASE_URL}/search/`, {
       params: {
         api_key: userSettings.comicvine_api_key,
         format: 'json',
         query: q,
-        resources: 'volume', // Search for volumes (series/collections)
-        limit: 10
+        resources: 'volume,issue', // Search for both volumes (series) and individual issues
+        limit: 50, // Increased from 10 to 50 for better results
+        field_list: 'id,name,publisher,start_year,deck,description,image,count_of_issues,volume,issue_number,cover_date,resource_type'
       },
       headers: {
         'User-Agent': 'OpenShelf Library Manager'
       },
-      timeout: 10000
+      timeout: 15000 // Increased timeout to 15 seconds
     });
 
     if (response.data.error !== 'OK') {
@@ -423,104 +426,209 @@ router.get('/comicvine/search', async (req, res) => {
       return res.json({ results: [] });
     }
 
-    const results = response.data.results.map(volume => ({
-      comicvine_id: volume.id?.toString(),
-      title: volume.name,
-      subtitle: volume.publisher?.name,
-      year: volume.start_year,
-      description: volume.deck || volume.description,
-      cover_url: volume.image?.medium_url || volume.image?.small_url,
-      issue_count: volume.count_of_issues,
-      publisher: volume.publisher?.name
-    }));
+    const results = response.data.results.map(item => {
+      // Check if this is an issue or a volume
+      const isIssue = item.resource_type === 'issue';
+      
+      return {
+        comicvine_id: item.id?.toString(),
+        title: isIssue 
+          ? `${item.volume?.name || 'Unknown'} #${item.issue_number || '?'}${item.name ? ` - ${item.name}` : ''}`
+          : item.name,
+        subtitle: isIssue
+          ? `${item.publisher?.name || ''} • ${item.cover_date || item.volume?.start_year || ''}`
+          : item.publisher?.name,
+        year: isIssue 
+          ? (item.cover_date ? new Date(item.cover_date).getFullYear() : item.volume?.start_year)
+          : item.start_year,
+        description: item.deck || item.description,
+        cover_url: item.image?.medium_url || item.image?.small_url,
+        issue_count: isIssue ? null : item.count_of_issues,
+        publisher: item.publisher?.name,
+        resource_type: item.resource_type,
+        issue_number: isIssue ? item.issue_number : null,
+        volume_name: isIssue ? item.volume?.name : null
+      };
+    });
 
     res.json({ results });
 
   } catch (error) {
     console.error('Comic Vine search error:', error.response?.data || error.message);
+    
+    // Handle specific error cases
+    if (error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT') {
+      return res.status(504).json({ 
+        error: 'Comic Vine API timeout',
+        message: 'The Comic Vine API took too long to respond. Please try again.'
+      });
+    }
+    
     if (error.response?.status === 401) {
       return res.status(401).json({ 
         error: 'Invalid Comic Vine API key',
-        message: 'Please check your Comic Vine API key in Settings'
+        message: 'Please check your Comic Vine API key in Settings. Get one at https://comicvine.gamespot.com/api/'
       });
     }
-    res.status(500).json({ error: 'Comic Vine search failed' });
+    
+    if (error.response?.status === 503) {
+      return res.status(503).json({ 
+        error: 'Comic Vine API unavailable',
+        message: 'The Comic Vine API is currently unavailable. Please try again later.'
+      });
+    }
+    
+    if (error.response?.status === 429) {
+      return res.status(429).json({ 
+        error: 'Rate limit exceeded',
+        message: 'Too many requests to Comic Vine API. Please wait a moment and try again.'
+      });
+    }
+    
+    res.status(500).json({ 
+      error: 'Comic Vine search failed',
+      message: error.response?.data?.error || error.message || 'An unexpected error occurred'
+    });
   }
 });
 
-// Get Comic Vine volume details
+// Get Comic Vine volume or issue details
 router.get('/comicvine/volume/:id', async (req, res) => {
   try {
     const { id } = req.params;
+    const { type } = req.query; // 'volume' or 'issue'
 
     const userSettings = getUserApiSettings(req.user.id);
     
     if (!userSettings.comicvine_api_key) {
-      return res.status(503).json({ 
+      return res.status(400).json({ 
         error: 'Comic Vine not configured',
-        message: 'Please configure your Comic Vine API key in Settings'
+        message: 'Please configure your Comic Vine API key in Settings. Get one at https://comicvine.gamespot.com/api/'
       });
     }
 
-    const response = await axios.get(`${COMICVINE_BASE_URL}/volume/4050-${id}/`, {
+    console.log(`Comic Vine ${type || 'volume'} details request for ID: ${id}`);
+
+    // Determine the resource type and ID prefix
+    const resourceType = type === 'issue' ? 'issue' : 'volume';
+    const idPrefix = type === 'issue' ? '4000' : '4050';
+    
+    // Different field lists for issues vs volumes
+    const fieldList = resourceType === 'issue'
+      ? 'id,name,volume,issue_number,publisher,cover_date,store_date,deck,description,image,person_credits,character_credits,story_arc_credits,aliases'
+      : 'id,name,publisher,start_year,deck,description,image,count_of_issues,people,person_credits,character_credits,concept_credits,location_credits,object_credits,story_arc_credits,team_credits,aliases';
+    
+    const response = await axios.get(`${COMICVINE_BASE_URL}/${resourceType}/${idPrefix}-${id}/`, {
       params: {
         api_key: userSettings.comicvine_api_key,
-        format: 'json'
+        format: 'json',
+        field_list: fieldList
       },
       headers: {
         'User-Agent': 'OpenShelf Library Manager'
       },
-      timeout: 10000
+      timeout: 15000
     });
 
     if (response.data.error !== 'OK') {
+      console.error('Comic Vine API error:', response.data.error);
       return res.status(500).json({ error: 'Comic Vine API error', details: response.data.error });
     }
 
-    const volume = response.data.results;
+    const item = response.data.results;
 
-    // Extract creators from characters/people data
+    // Extract creators from person_credits (for issues) or people (for volumes)
     const creators = [];
-    if (volume.people) {
-      volume.people.forEach(person => {
-        creators.push({ name: person.name, role: 'creator' });
-      });
-    }
+    const creditsSource = item.person_credits || item.people || [];
+    creditsSource.forEach(person => {
+      creators.push({ name: person.name, role: person.role || 'creator' });
+    });
 
     // Clean HTML from description
-    let description = volume.description || volume.deck || '';
+    let description = item.description || item.deck || '';
     description = description.replace(/<[^>]*>/g, '').trim();
 
+    // Handle different data structures for issues vs volumes
+    const isIssue = resourceType === 'issue';
+    
+    // For issues, construct a proper title
+    let title = item.name;
+    if (isIssue && item.volume) {
+      const volumeName = item.volume.name || 'Unknown';
+      const issueNum = item.issue_number || '?';
+      const issueName = item.name || '';
+      title = `${volumeName} #${issueNum}${issueName ? ` - ${issueName}` : ''}`;
+    }
+    
     res.json({
       source: 'comicvine',
       data: {
-        comicvine_id: volume.id?.toString(),
-        title: volume.name,
-        subtitle: volume.publisher?.name,
+        comicvine_id: item.id?.toString(),
+        title: title,
+        subtitle: (isIssue ? item.volume?.publisher?.name : item.publisher?.name) || '',
         description: description,
-        cover_url: volume.image?.medium_url || volume.image?.small_url,
-        publish_date: volume.start_year?.toString(),
-        publisher: volume.publisher?.name,
+        cover_url: item.image?.medium_url || item.image?.small_url,
+        publish_date: isIssue 
+          ? (item.cover_date || item.store_date)
+          : item.start_year?.toString(),
+        publisher: (isIssue ? item.volume?.publisher?.name : item.publisher?.name) || '',
         creators: creators,
-        tags: volume.genres?.map(g => g.name) || [],
-        page_count: volume.count_of_issues, // Store issue count as page count
+        tags: item.story_arc_credits?.map(arc => arc.name) || [],
+        page_count: isIssue ? null : item.count_of_issues,
         metadata: {
-          issue_count: volume.count_of_issues,
-          api_url: volume.api_detail_url,
-          site_url: volume.site_detail_url
+          resource_type: resourceType,
+          issue_count: item.count_of_issues,
+          issue_number: item.issue_number,
+          volume_name: isIssue ? item.volume?.name : item.name,
+          api_url: item.api_detail_url,
+          site_url: item.site_detail_url
         }
       }
     });
 
   } catch (error) {
     console.error('Comic Vine details error:', error.response?.data || error.message);
+    
+    // Handle specific error cases
+    if (error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT') {
+      return res.status(504).json({ 
+        error: 'Comic Vine API timeout',
+        message: 'The Comic Vine API took too long to respond. Please try again.'
+      });
+    }
+    
     if (error.response?.status === 401) {
       return res.status(401).json({ 
         error: 'Invalid Comic Vine API key',
-        message: 'Please check your Comic Vine API key in Settings'
+        message: 'Please check your Comic Vine API key in Settings. Get one at https://comicvine.gamespot.com/api/'
       });
     }
-    res.status(500).json({ error: 'Comic Vine lookup failed' });
+    
+    if (error.response?.status === 404) {
+      return res.status(404).json({ 
+        error: 'Not found',
+        message: 'The requested comic was not found on Comic Vine.'
+      });
+    }
+    
+    if (error.response?.status === 503) {
+      return res.status(503).json({ 
+        error: 'Comic Vine API unavailable',
+        message: 'The Comic Vine API is currently unavailable. Please try again later.'
+      });
+    }
+    
+    if (error.response?.status === 429) {
+      return res.status(429).json({ 
+        error: 'Rate limit exceeded',
+        message: 'Too many requests to Comic Vine API. Please wait a moment and try again.'
+      });
+    }
+    
+    res.status(500).json({ 
+      error: 'Comic Vine lookup failed',
+      message: error.response?.data?.error || error.message || 'An unexpected error occurred'
+    });
   }
 });
 
