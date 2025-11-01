@@ -1,16 +1,18 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useItemStore } from '../store/itemStore';
+import { useAuthStore } from '../store/authStore';
 import { useCurrencyStore } from '../store/currencyStore';
 import useReadingStatusStore from '../store/readingStatusStore';
 import toast from 'react-hot-toast';
-import { FiEdit2, FiTrash2, FiArrowLeft, FiCalendar, FiBook, FiMapPin, FiStar, FiHeart, FiBookOpen, FiCheckCircle, FiClock } from 'react-icons/fi';
+import { FiEdit2, FiTrash2, FiArrowLeft, FiCalendar, FiBook, FiMapPin, FiStar, FiHeart, FiBookOpen, FiCheckCircle, FiClock, FiLock } from 'react-icons/fi';
 
 export default function ItemDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const getItemById = useItemStore((state) => state.getItemById);
   const { formatPrice } = useCurrencyStore();
+  const { isAdmin } = useAuthStore();
   const { deleteItem, updateItem, fetchItems } = useItemStore();
   const { fetchReadingStatus, updateReadingStatus, deleteReadingStatus, getReadingStatus } = useReadingStatusStore();
   const [item, setItem] = useState(null);
@@ -370,17 +372,26 @@ export default function ItemDetail() {
                 <FiHeart className={`inline ${item.wishlist ? 'fill-current' : ''}`} />
                 {item.wishlist ? 'Remove from Wishlist' : 'Add to Wishlist'}
               </button>
-              <Link to={`/items/${id}/edit`} className="btn btn-primary flex-1">
-                <FiEdit2 className="inline mr-2" />
-                Edit
-              </Link>
-              <button
-                onClick={() => setShowDeleteConfirm(true)}
-                className="btn btn-danger"
-              >
-                <FiTrash2 className="inline mr-2" />
-                Delete
-              </button>
+              {isAdmin() ? (
+                <>
+                  <Link to={`/items/${id}/edit`} className="btn btn-primary flex-1">
+                    <FiEdit2 className="inline mr-2" />
+                    Edit
+                  </Link>
+                  <button
+                    onClick={() => setShowDeleteConfirm(true)}
+                    className="btn btn-danger"
+                  >
+                    <FiTrash2 className="inline mr-2" />
+                    Delete
+                  </button>
+                </>
+              ) : (
+                <div className="flex-1 flex items-center gap-2 text-gray-500 dark:text-gray-400 text-sm px-4">
+                  <FiLock />
+                  <span>Read-only access - Contact an admin to edit this item</span>
+                </div>
+              )}
             </div>
           </div>
         </div>

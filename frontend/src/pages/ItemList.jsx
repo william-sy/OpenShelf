@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useItemStore } from '../store/itemStore';
-import { FiBook, FiSearch, FiFilter, FiPlus, FiImage, FiHeart, FiDownload, FiUpload } from 'react-icons/fi';
+import { useAuthStore } from '../store/authStore';
+import { FiBook, FiSearch, FiFilter, FiPlus, FiImage, FiHeart, FiDownload, FiUpload, FiLock } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 import api from '../services/api';
 
 export default function ItemList() {
   const { items, loading, filter, setFilter, fetchItems } = useItemStore();
+  const { isAdmin } = useAuthStore();
   const [searchInput, setSearchInput] = useState(filter.search);
   const [showImportModal, setShowImportModal] = useState(false);
   const [importFile, setImportFile] = useState(null);
@@ -108,7 +110,15 @@ export default function ItemList() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">Library</h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">{items.length} items in your collection</p>
+          <p className="text-gray-600 dark:text-gray-400 mt-1">
+            {items.length} items in your collection
+            {!isAdmin() && (
+              <span className="ml-3 text-sm inline-flex items-center gap-1 text-yellow-600 dark:text-yellow-500">
+                <FiLock className="text-xs" />
+                Read-only access
+              </span>
+            )}
+          </p>
         </div>
         <div className="flex gap-3">
           <div className="relative group">
@@ -131,17 +141,21 @@ export default function ItemList() {
               </button>
             </div>
           </div>
-          <button 
-            onClick={() => setShowImportModal(true)}
-            className="btn btn-secondary flex items-center gap-2"
-          >
-            <FiUpload />
-            Import
-          </button>
-          <Link to="/items/add" className="btn btn-primary flex items-center gap-2">
-            <FiPlus />
-            Add Item
-          </Link>
+          {isAdmin() && (
+            <>
+              <button 
+                onClick={() => setShowImportModal(true)}
+                className="btn btn-secondary flex items-center gap-2"
+              >
+                <FiUpload />
+                Import
+              </button>
+              <Link to="/items/add" className="btn btn-primary flex items-center gap-2">
+                <FiPlus />
+                Add Item
+              </Link>
+            </>
+          )}
         </div>
       </div>
 

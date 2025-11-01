@@ -5,6 +5,7 @@ import multer from 'multer';
 import { Item } from '../models/Item.js';
 import ReadingStatus from '../models/ReadingStatus.js';
 import { authenticateToken } from '../middleware/auth.js';
+import { requireAdmin } from '../middleware/rbac.js';
 
 // Configure multer for import file uploads
 const upload = multer({ 
@@ -17,7 +18,7 @@ const router = express.Router();
 // All routes require authentication
 router.use(authenticateToken);
 
-// Get all items for current user
+// Get all items (shared library - all users see all items)
 router.get('/', (req, res) => {
   try {
     const { 
@@ -63,7 +64,8 @@ router.get('/', (req, res) => {
     // Remove undefined values
     Object.keys(filters).forEach(key => filters[key] === undefined && delete filters[key]);
 
-    const items = Item.findByUserId(req.user.id, filters);
+    // Shared library: show all items to all users
+    const items = Item.findAll(filters);
     res.json(items);
   } catch (error) {
     console.error('Error fetching items:', error);
@@ -71,7 +73,7 @@ router.get('/', (req, res) => {
   }
 });
 
-// Get item by ID
+// Get item by ID (shared library - all users can view)
 router.get('/:id', (req, res) => {
   try {
     const item = Item.findById(req.params.id);
@@ -80,11 +82,7 @@ router.get('/:id', (req, res) => {
       return res.status(404).json({ error: 'Item not found' });
     }
 
-    // Check ownership
-    if (item.user_id !== req.user.id && req.user.role !== 'admin') {
-      return res.status(403).json({ error: 'Access denied' });
-    }
-
+    // Shared library: all authenticated users can view any item
     res.json(item);
   } catch (error) {
     console.error('Error fetching item:', error);
@@ -92,8 +90,9 @@ router.get('/:id', (req, res) => {
   }
 });
 
-// Create new item
+// Create new item (admin only)
 router.post('/',
+  requireAdmin,
   body('type').isIn(['book', 'comic', 'cd', 'dvd', 'other']),
   body('title').trim().notEmpty(),
   (req, res) => {
@@ -117,8 +116,8 @@ router.post('/',
   }
 );
 
-// Update item
-router.put('/:id', (req, res) => {
+// Update item (admin only)
+router.put('/:id', requireAdmin, (req, res) => {
   try {
     const item = Item.findById(req.params.id);
     
@@ -147,8 +146,8 @@ router.put('/:id', (req, res) => {
   }
 });
 
-// Delete item
-router.delete('/:id', (req, res) => {
+// Delete item (admin only)
+router.delete('/:id', requireAdmin, (req, res) => {
   try {
     const item = Item.findById(req.params.id);
     
@@ -241,8 +240,8 @@ router.get('/export', (req, res) => {
   }
 });
 
-// Import items from CSV or JSON file
-router.post('/import', upload.single('file'), (req, res) => {
+// Import items from CSV or JSON file (admin only)
+router.post('/import', requireAdmin, upload.single('file'), (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No file uploaded' });

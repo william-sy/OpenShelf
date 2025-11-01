@@ -190,6 +190,113 @@ export const Item = {
     return items.map(item => this._parseItem(item));
   },
 
+  // Shared library: find all items with same filters as findByUserId
+  findAll(filters = {}) {
+    let query = 'SELECT * FROM items WHERE 1=1';
+    const params = [];
+
+    // Type filter (can be multiple)
+    if (filters.type) {
+      const types = Array.isArray(filters.type) ? filters.type : [filters.type];
+      const placeholders = types.map(() => '?').join(',');
+      query += ` AND type IN (${placeholders})`;
+      params.push(...types);
+    }
+
+    // Wishlist filter
+    if (filters.wishlist !== undefined) {
+      query += ' AND wishlist = ?';
+      params.push(filters.wishlist ? 1 : 0);
+    }
+
+    // Rating filter (exact or range)
+    if (filters.rating !== undefined) {
+      query += ' AND rating = ?';
+      params.push(filters.rating);
+    }
+    if (filters.minRating !== undefined) {
+      query += ' AND rating >= ?';
+      params.push(filters.minRating);
+    }
+    if (filters.maxRating !== undefined) {
+      query += ' AND rating <= ?';
+      params.push(filters.maxRating);
+    }
+
+    // Condition filter
+    if (filters.condition) {
+      const conditions = Array.isArray(filters.condition) ? filters.condition : [filters.condition];
+      const placeholders = conditions.map(() => '?').join(',');
+      query += ` AND condition IN (${placeholders})`;
+      params.push(...conditions);
+    }
+
+    // Date range filters
+    if (filters.purchaseDateFrom) {
+      query += ' AND purchase_date >= ?';
+      params.push(filters.purchaseDateFrom);
+    }
+    if (filters.purchaseDateTo) {
+      query += ' AND purchase_date <= ?';
+      params.push(filters.purchaseDateTo);
+    }
+
+    // Publisher filter
+    if (filters.publisher) {
+      query += ' AND publisher LIKE ?';
+      params.push(`%${filters.publisher}%`);
+    }
+
+    // Location filter
+    if (filters.location) {
+      query += ' AND location LIKE ?';
+      params.push(`%${filters.location}%`);
+    }
+
+    // Tags filter (inclusive - must have all specified tags)
+    if (filters.tags) {
+      const tagList = Array.isArray(filters.tags) ? filters.tags : [filters.tags];
+      tagList.forEach(tag => {
+        query += ' AND tags LIKE ?';
+        params.push(`%"${tag}"%`);
+      });
+    }
+
+    // Exclude tags filter
+    if (filters.excludeTags) {
+      const excludeList = Array.isArray(filters.excludeTags) ? filters.excludeTags : [filters.excludeTags];
+      excludeList.forEach(tag => {
+        query += ' AND (tags IS NULL OR tags NOT LIKE ?)';
+        params.push(`%"${tag}"%`);
+      });
+    }
+
+    // Full-text search (title, creators, isbn, barcode, description, tags)
+    if (filters.search) {
+      query += ' AND (title LIKE ? OR creators LIKE ? OR isbn LIKE ? OR barcode LIKE ? OR description LIKE ? OR tags LIKE ?)';
+      const searchTerm = `%${filters.search}%`;
+      params.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
+    }
+
+    // Sorting
+    const sortBy = filters.sortBy || 'created_at';
+    const sortOrder = filters.sortOrder === 'asc' ? 'ASC' : 'DESC';
+    query += ` ORDER BY ${sortBy} ${sortOrder}`;
+
+    // Pagination
+    if (filters.limit) {
+      query += ' LIMIT ?';
+      params.push(filters.limit);
+    }
+    if (filters.offset) {
+      query += ' OFFSET ?';
+      params.push(filters.offset);
+    }
+
+    const items = db.prepare(query).all(...params);
+    return items.map(item => this._parseItem(item));
+  },
+
   getAll(filters = {}) {
     let query = 'SELECT * FROM items WHERE 1=1';
     const params = [];

@@ -16,6 +16,7 @@ import ItemDetail from './pages/ItemDetail';
 import Wishlist from './pages/Wishlist';
 import Statistics from './pages/Statistics';
 import ReadingStats from './pages/ReadingStats';
+import UserManagement from './pages/UserManagement';
 import Settings from './pages/Settings';
 
 // Components
@@ -61,6 +62,7 @@ function App() {
           <Route path="wishlist" element={<Wishlist />} />
           <Route path="statistics" element={<Statistics />} />
           <Route path="reading-stats" element={<ReadingStats />} />
+          <Route path="user-management" element={<UserManagement />} />
           <Route path="settings" element={<Settings />} />
         </Route>
       </Routes>

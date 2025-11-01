@@ -12,7 +12,7 @@ export function initializeDatabase() {
       email TEXT UNIQUE NOT NULL,
       password_hash TEXT NOT NULL,
       display_name TEXT,
-      role TEXT DEFAULT 'user' CHECK(role IN ('admin', 'user')),
+      role TEXT DEFAULT 'reader' CHECK(role IN ('admin', 'user', 'reader')),
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
@@ -276,6 +276,88 @@ export function initializeDatabase() {
     console.log('🔄 Adding currency column to api_settings table...');
     db.exec(`ALTER TABLE api_settings ADD COLUMN currency TEXT DEFAULT 'USD'`);
     console.log('✅ currency column added');
+  }
+
+  // Migrate existing 'user' roles to 'reader' for RBAC
+  // Check if we need to update the users table to support 'reader' role
+  const userRoleInfo = db.prepare("PRAGMA table_info(users)").all();
+  const roleColumn = userRoleInfo.find(col => col.name === 'role');
+  
+  if (roleColumn) {
+    // Check if there are any users with 'user' role that need migration
+    const usersToUpdate = db.prepare("SELECT id, role FROM users WHERE role = 'user'").all();
+    if (usersToUpdate.length > 0) {
+      console.log(`🔄 Migrating ${usersToUpdate.length} users from 'user' role to 'reader' role...`);
+      
+      // SQLite doesn't support ALTER TABLE to modify CHECK constraints
+      // We need to recreate the table with the new constraint
+      console.log('🔄 Recreating users table with updated role constraint...');
+      
+      // Create a transaction for the migration
+      db.exec(`
+        BEGIN TRANSACTION;
+        
+        -- Create new table with updated CHECK constraint
+        CREATE TABLE users_new (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          username TEXT UNIQUE NOT NULL,
+          email TEXT UNIQUE NOT NULL,
+          password_hash TEXT NOT NULL,
+          display_name TEXT,
+          role TEXT DEFAULT 'reader' CHECK(role IN ('admin', 'user', 'reader')),
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+        
+        -- Copy data from old table, converting 'user' to 'reader'
+        INSERT INTO users_new (id, username, email, password_hash, display_name, role, created_at, updated_at)
+        SELECT 
+          id, 
+          username, 
+          email, 
+          password_hash, 
+          display_name, 
+          CASE WHEN role = 'user' THEN 'reader' ELSE role END as role,
+          created_at, 
+          updated_at
+        FROM users;
+        
+        -- Drop old table
+        DROP TABLE users;
+        
+        -- Rename new table
+        ALTER TABLE users_new RENAME TO users;
+        
+        COMMIT;
+      `);
+      
+      console.log('✅ User roles migrated to reader and table constraint updated');
+    }
+  }
+
+  // Migrate to shared library model
+  // Consolidate all items under a single admin/user (shared library)
+  console.log('🔄 Checking for shared library migration...');
+  const adminUser = db.prepare("SELECT id FROM users WHERE role = 'admin' ORDER BY created_at ASC LIMIT 1").get();
+  
+  if (adminUser) {
+    // Check if there are items belonging to non-existent users or multiple users
+    const itemsNeedingMigration = db.prepare(`
+      SELECT COUNT(*) as count 
+      FROM items 
+      WHERE user_id NOT IN (SELECT id FROM users) 
+         OR user_id != ?
+    `).get(adminUser.id);
+    
+    if (itemsNeedingMigration && itemsNeedingMigration.count > 0) {
+      console.log(`🔄 Migrating ${itemsNeedingMigration.count} items to shared library (admin user ${adminUser.id})...`);
+      const result = db.prepare("UPDATE items SET user_id = ?").run(adminUser.id);
+      console.log(`✅ All ${result.changes} items now belong to admin user (shared library model)`);
+    } else {
+      console.log('✅ Shared library already configured');
+    }
+  } else {
+    console.log('⚠️  No admin user found, skipping shared library migration');
   }
 
   // Create indexes for better performance

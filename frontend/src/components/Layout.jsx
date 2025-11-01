@@ -6,6 +6,7 @@ import {
   FiHeart,
   FiTrendingUp,
   FiBarChart2,
+  FiUsers,
   FiSettings, 
   FiLogOut, 
   FiMenu,
@@ -14,7 +15,7 @@ import {
 import { useState } from 'react';
 
 export default function Layout() {
-  const { user, logout } = useAuthStore();
+  const { user, logout, isAdmin } = useAuthStore();
   const location = useLocation();
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -30,6 +31,7 @@ export default function Layout() {
     { name: 'Wishlist', href: '/wishlist', icon: FiHeart },
     { name: 'Statistics', href: '/statistics', icon: FiTrendingUp },
     { name: 'Reading Stats', href: '/reading-stats', icon: FiBarChart2 },
+    ...(isAdmin() ? [{ name: 'User Management', href: '/user-management', icon: FiUsers, adminOnly: true }] : []),
     { name: 'Settings', href: '/settings', icon: FiSettings },
   ];
 
