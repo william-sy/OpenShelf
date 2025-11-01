@@ -69,9 +69,10 @@ export default function EditItem() {
         },
       });
 
+      // Backend now returns full URL, no need to prepend API URL
       setFormData(prev => ({
         ...prev,
-        cover_url: `${import.meta.env.VITE_API_URL}${response.data.url}`,
+        cover_url: response.data.url,
       }));
 
       toast.success('Image uploaded successfully!');

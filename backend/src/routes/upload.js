@@ -16,8 +16,11 @@ router.post('/', authenticateToken, upload.single('image'), (req, res) => {
       return res.status(400).json({ error: 'No file uploaded' });
     }
 
-    // Return the URL to access the image
-    const imageUrl = `/uploads/${req.file.filename}`;
+    // Construct full URL based on request
+    const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'http';
+    const host = req.headers['x-forwarded-host'] || req.headers.host;
+    const baseUrl = `${protocol}://${host}`;
+    const imageUrl = `${baseUrl}/uploads/${req.file.filename}`;
     
     res.json({
       message: 'Image uploaded successfully',

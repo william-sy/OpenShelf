@@ -223,6 +223,7 @@ docker-compose up -d
 ### Future Features
 - [ ] Lending system with due dates and reminders
 - [ ] book / music suggestions?
+- [ ] copy / paste / have multiple versions of the same comic
 - [ ] MusicBrainz integration for music metadata
 - [ ] Mobile app (iOS/Android)? (browser works fine for now)
 
