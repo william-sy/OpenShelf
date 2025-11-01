@@ -224,7 +224,6 @@ docker-compose up -d
 ### Future Features
 - [ ] Lending system with due dates and reminders
 - [ ] book / music suggestions?
-- [ ] Library pagination
 - [ ] remove debug button
 - [ ] item page button row needs fixing for mobile. 
 - [ ] MusicBrainz integration for music metadata
