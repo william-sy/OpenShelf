@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useItemStore } from '../store/itemStore';
 import { useCurrencyStore } from '../store/currencyStore';
 import toast from 'react-hot-toast';
@@ -9,10 +9,15 @@ import api from '../services/api';
 
 export default function AddItem() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { addItem, lookupISBN } = useItemStore();
   const { currencyCode } = useCurrencyStore();
   const [showScanner, setShowScanner] = useState(false);
-  const [formData, setFormData] = useState({
+  
+  // Check if we're duplicating an item
+  const duplicateFrom = location.state?.duplicateFrom;
+  
+  const [formData, setFormData] = useState(duplicateFrom || {
     type: 'book',
     title: '',
     subtitle: '',
@@ -39,6 +44,14 @@ export default function AddItem() {
     comicvine_id: '',
     wishlist: false,
   });
+  
+  // Show toast if duplicating
+  useEffect(() => {
+    if (duplicateFrom) {
+      toast.success('Creating duplicate - Update the details for this copy');
+    }
+  }, [duplicateFrom]);
+
   const [creatorInput, setCreatorInput] = useState({ name: '', role: 'author' });
   const [tagInput, setTagInput] = useState('');
   const [lookingUp, setLookingUp] = useState(false);

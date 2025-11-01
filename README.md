@@ -219,11 +219,14 @@ docker-compose up -d
 - [x] Statistics and collection insights with visual charts
 - [x] Wishlist feature for tracking items to acquire
 - [x] Advanced search and filters (multi-parameter, date ranges, ratings)
+- [x] copy / paste / have multiple versions of the same comic
 
 ### Future Features
 - [ ] Lending system with due dates and reminders
 - [ ] book / music suggestions?
-- [ ] copy / paste / have multiple versions of the same comic
+- [ ] Library pagination
+- [ ] remove debug button
+- [ ] item page button row needs fixing for mobile. 
 - [ ] MusicBrainz integration for music metadata
 - [ ] Mobile app (iOS/Android)? (browser works fine for now)
 

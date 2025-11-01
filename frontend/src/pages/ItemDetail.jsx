@@ -5,7 +5,7 @@ import { useAuthStore } from '../store/authStore';
 import { useCurrencyStore } from '../store/currencyStore';
 import useReadingStatusStore from '../store/readingStatusStore';
 import toast from 'react-hot-toast';
-import { FiEdit2, FiTrash2, FiArrowLeft, FiCalendar, FiBook, FiMapPin, FiStar, FiHeart, FiBookOpen, FiCheckCircle, FiClock, FiLock } from 'react-icons/fi';
+import { FiEdit2, FiTrash2, FiArrowLeft, FiCalendar, FiBook, FiMapPin, FiStar, FiHeart, FiBookOpen, FiCheckCircle, FiClock, FiLock, FiCopy } from 'react-icons/fi';
 
 export default function ItemDetail() {
   const { id } = useParams();
@@ -65,6 +65,27 @@ export default function ItemDetail() {
     } catch (error) {
       toast.error('Failed to delete item');
     }
+  };
+
+  const handleDuplicate = () => {
+    // Navigate to add item page with item data as state
+    navigate('/items/add', { 
+      state: { 
+        duplicateFrom: {
+          ...item,
+          // Clear unique fields that shouldn't be duplicated
+          id: undefined,
+          created_at: undefined,
+          updated_at: undefined,
+          // Suggest user updates these
+          notes: item.notes ? `[Copy] ${item.notes}` : '',
+          condition: '', // User should set condition for the new copy
+          purchase_date: '', // User should set purchase date for new copy
+          purchase_price: '', // User should set price for new copy
+          location: '', // User should set location for new copy
+        }
+      }
+    });
   };
 
   const handleWishlistToggle = async () => {
@@ -374,15 +395,23 @@ export default function ItemDetail() {
               </button>
               {isAdmin() ? (
                 <>
-                  <Link to={`/items/${id}/edit`} className="btn btn-primary flex-1">
-                    <FiEdit2 className="inline mr-2" />
+                  <button
+                    onClick={handleDuplicate}
+                    className="btn btn-secondary flex items-center gap-2"
+                    title="Create a copy of this item (useful for multiple editions)"
+                  >
+                    <FiCopy className="inline" />
+                    Duplicate
+                  </button>
+                  <Link to={`/items/${id}/edit`} className="btn btn-primary flex items-center gap-2">
+                    <FiEdit2 className="inline" />
                     Edit
                   </Link>
                   <button
                     onClick={() => setShowDeleteConfirm(true)}
-                    className="btn btn-danger"
+                    className="btn btn-danger flex items-center gap-2"
                   >
-                    <FiTrash2 className="inline mr-2" />
+                    <FiTrash2 className="inline" />
                     Delete
                   </button>
                 </>
