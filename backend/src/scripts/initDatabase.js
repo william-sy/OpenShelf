@@ -335,6 +335,20 @@ export function initializeDatabase() {
     }
   }
 
+  // Add currency column to users table if it doesn't exist
+  console.log('🔄 Checking for user preferences migration...');
+  const currencyColumnExists = db.prepare(`
+    SELECT COUNT(*) as count 
+    FROM pragma_table_info('users') 
+    WHERE name = 'currency'
+  `).get();
+  
+  if (currencyColumnExists.count === 0) {
+    console.log('🔄 Adding currency column to users table...');
+    db.exec(`ALTER TABLE users ADD COLUMN currency TEXT DEFAULT 'USD'`);
+    console.log('✅ Currency column added to users table');
+  }
+
   // Migrate to shared library model
   // Consolidate all items under a single admin/user (shared library)
   console.log('🔄 Checking for shared library migration...');

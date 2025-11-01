@@ -33,8 +33,13 @@ export default function Settings() {
   });
 
   useEffect(() => {
-    // Load API settings and currency on component mount
+    // Load API settings and currency on component mount (admin only)
     const loadApiSettings = async () => {
+      // Only load API settings if user is admin
+      if (!isAdmin()) {
+        return;
+      }
+      
       try {
         const response = await api.get('/api/settings/apis');
         // Store original keys to check if they're set
@@ -55,7 +60,7 @@ export default function Settings() {
       }
     };
     loadApiSettings();
-  }, [setCurrency]);
+  }, [setCurrency, isAdmin]);
 
   const handlePasswordChange = async (e) => {
     e.preventDefault();
@@ -260,19 +265,21 @@ export default function Settings() {
         </form>
       </div>
 
-      {/* API Settings */}
-      <div className="card">
-        <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-4 flex items-center gap-2">
-          <FiKey className="w-5 h-5" />
-          API Settings
-          {!isAdmin() && (
+      {/* API Settings - Admin Only */}
+      {isAdmin() && (
+        <div className="card">
+          <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-4 flex items-center gap-2">
+            <FiKey className="w-5 h-5" />
+            API Settings
             <span className="text-xs font-normal text-gray-500 dark:text-gray-400 flex items-center gap-1">
               <FiShield className="w-3 h-3" />
               Admin Only
             </span>
-          )}
-        </h2>
-        <form onSubmit={handleApiSettingsUpdate} className="space-y-4">
+          </h2>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+            These settings are shared across all users and require administrator access.
+          </p>
+          <form onSubmit={handleApiSettingsUpdate} className="space-y-4">
           {!isAdmin() && (
             <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 mb-4">
               <p className="text-sm text-yellow-800 dark:text-yellow-300">
@@ -400,6 +407,7 @@ export default function Settings() {
           )}
         </form>
       </div>
+      )}
 
       {/* Change Password */}
       <div className="card">

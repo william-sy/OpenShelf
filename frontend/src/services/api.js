@@ -56,11 +56,20 @@ api.interceptors.response.use(
       data: error.response?.data
     });
     
-    if (error.response?.status === 401 || error.response?.status === 403) {
+    // Only redirect to login if:
+    // 1. We have a token (meaning it's invalid/expired)
+    // 2. We get 401 or 403
+    // 3. We're not already on the login/register page
+    const hasToken = !!localStorage.getItem('token');
+    const isAuthError = error.response?.status === 401 || error.response?.status === 403;
+    const isOnAuthPage = window.location.pathname === '/login' || window.location.pathname === '/register';
+    
+    if (hasToken && isAuthError && !isOnAuthPage) {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       window.location.href = '/login';
     }
+    
     return Promise.reject(error);
   }
 );

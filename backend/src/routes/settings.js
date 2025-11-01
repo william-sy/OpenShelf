@@ -5,7 +5,22 @@ import { ApiSettings } from '../models/ApiSettings.js';
 
 const router = express.Router();
 
-// All routes require authentication
+// Public endpoint for currency setting (no auth required)
+router.get('/currency', async (req, res) => {
+  try {
+    // Get system-wide currency setting from admin user (user_id = 1)
+    const settings = ApiSettings.findByUserId(1);
+    
+    res.json({
+      currency: settings?.currency || 'USD'
+    });
+  } catch (error) {
+    console.error('Error fetching currency setting:', error);
+    res.json({ currency: 'USD' }); // Return default on error
+  }
+});
+
+// All other routes require authentication
 router.use(authenticateToken);
 
 // Get API settings (all users can view, but shared across all users)

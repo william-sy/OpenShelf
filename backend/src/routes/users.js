@@ -7,6 +7,46 @@ const router = express.Router();
 // All routes require authentication
 router.use(authenticateToken);
 
+// Get current user's preferences
+router.get('/me/preferences', (req, res) => {
+  try {
+    const user = User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    res.json({
+      currency: user.currency || 'USD',
+      display_name: user.display_name || ''
+    });
+  } catch (error) {
+    console.error('Error fetching user preferences:', error);
+    res.status(500).json({ error: 'Failed to fetch preferences' });
+  }
+});
+
+// Update current user's preferences
+router.put('/me/preferences', (req, res) => {
+  try {
+    const { currency } = req.body;
+    
+    // Update user's currency preference
+    const success = User.update(req.user.id, { currency });
+    
+    if (!success) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const user = User.findById(req.user.id);
+    res.json({
+      message: 'Preferences updated successfully',
+      currency: user.currency || 'USD'
+    });
+  } catch (error) {
+    console.error('Error updating user preferences:', error);
+    res.status(500).json({ error: 'Failed to update preferences' });
+  }
+});
+
 // Get all users (admin only)
 router.get('/', requireAdmin, (req, res) => {
   try {

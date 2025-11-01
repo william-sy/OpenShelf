@@ -7,21 +7,33 @@ const useCurrencyStore = create((set, get) => ({
   currencyCode: 'USD',
   loaded: false,
   
-  // Load currency from backend
+  // Load currency from user preferences (authenticated) or system-wide setting (public)
   loadCurrency: async () => {
     try {
-      const response = await api.get('/api/settings/apis');
+      // Try to load from user preferences first (authenticated endpoint)
+      const response = await api.get('/api/users/me/preferences');
       const currency = response.data.currency || 'USD';
-      get().setCurrency(currency);
+      get().setCurrencyLocal(currency);
       set({ loaded: true });
-    } catch (error) {
-      console.error('Failed to load currency setting:', error);
-      // Use default USD if loading fails
-      set({ loaded: true });
+    } catch (authError) {
+      // If not authenticated (401) or request failed, try public system-wide setting
+      // This is expected behavior, not an error
+      try {
+        const response = await api.get('/api/settings/currency');
+        const currency = response.data.currency || 'USD';
+        get().setCurrencyLocal(currency);
+        set({ loaded: true });
+      } catch (publicError) {
+        // Only log if both endpoints fail
+        console.warn('Could not load currency from backend, using default USD');
+        get().setCurrencyLocal('USD');
+        set({ loaded: true });
+      }
     }
   },
   
-  setCurrency: async (currency) => {
+  // Set currency locally without saving to backend
+  setCurrencyLocal: (currency) => {
     const currencyMap = {
       'USD': { symbol: '$', code: 'USD' },
       'EUR': { symbol: '€', code: 'EUR' },
@@ -38,16 +50,18 @@ const useCurrencyStore = create((set, get) => ({
       currencySymbol: selected.symbol,
       currencyCode: selected.code
     });
+  },
+  
+  // Set currency and save to user preferences (all authenticated users)
+  setCurrency: async (currency) => {
+    get().setCurrencyLocal(currency);
     
-    // Save to backend (don't await to avoid blocking UI)
+    // Save to user preferences (requires authentication)
     try {
-      const response = await api.get('/api/settings/apis');
-      await api.put('/api/settings/apis', {
-        ...response.data,
-        currency: selected.code
-      });
+      await api.put('/api/users/me/preferences', { currency });
     } catch (error) {
-      console.error('Failed to save currency setting:', error);
+      console.error('Failed to save currency preference:', error);
+      throw error; // Re-throw to show error to user
     }
   },
   

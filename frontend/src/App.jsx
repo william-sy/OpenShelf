@@ -34,10 +34,12 @@ function App() {
 
   useEffect(() => {
     initTheme();
-    if (isAuthenticated) {
-      loadCurrency();
-    }
-  }, [initTheme, loadCurrency, isAuthenticated]);
+  }, [initTheme]);
+  
+  // Load currency when authentication state changes or on mount
+  useEffect(() => {
+    loadCurrency();
+  }, [isAuthenticated, loadCurrency]);
 
   return (
     <BrowserRouter>
