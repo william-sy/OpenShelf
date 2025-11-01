@@ -4,10 +4,10 @@ import { useThemeStore } from '../store/themeStore';
 import { useCurrencyStore } from '../store/currencyStore';
 import toast from 'react-hot-toast';
 import api from '../services/api';
-import { FiUser, FiMail, FiLock, FiSave, FiMoon, FiSun, FiKey, FiCheck, FiDollarSign } from 'react-icons/fi';
+import { FiUser, FiMail, FiLock, FiSave, FiMoon, FiSun, FiKey, FiCheck, FiDollarSign, FiShield } from 'react-icons/fi';
 
 export default function Settings() {
-  const { user, updateUser } = useAuthStore();
+  const { user, updateUser, isAdmin } = useAuthStore();
   const { isDark, toggleTheme } = useThemeStore();
   const { currencyCode, setCurrency } = useCurrencyStore();
   const [passwords, setPasswords] = useState({
@@ -265,12 +265,26 @@ export default function Settings() {
         <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-4 flex items-center gap-2">
           <FiKey className="w-5 h-5" />
           API Settings
+          {!isAdmin() && (
+            <span className="text-xs font-normal text-gray-500 dark:text-gray-400 flex items-center gap-1">
+              <FiShield className="w-3 h-3" />
+              Admin Only
+            </span>
+          )}
         </h2>
         <form onSubmit={handleApiSettingsUpdate} className="space-y-4">
+          {!isAdmin() && (
+            <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 mb-4">
+              <p className="text-sm text-yellow-800 dark:text-yellow-300">
+                <FiShield className="inline w-4 h-4 mr-1" />
+                Only administrators can modify API settings. These are shared across all users.
+              </p>
+            </div>
+          )}
           <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-4">
             <p className="text-sm text-blue-800 dark:text-blue-300">
               Configure API keys for enhanced features like movie metadata lookup (TMDB) and media server integration (Jellyfin).
-              These settings are optional but enable additional functionality.
+              These settings are shared across all users and are optional but enable additional functionality.
             </p>
           </div>
 
@@ -283,6 +297,7 @@ export default function Settings() {
                 onChange={(e) => setApiSettings({ ...apiSettings, tmdb_api_key: e.target.value })}
                 className="input pr-10"
                 placeholder="Your TMDB API key for movie/TV metadata"
+                disabled={!isAdmin()}
               />
               {originalApiSettings.tmdb_api_key && (
                 <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 text-green-600 dark:text-green-400">
@@ -312,6 +327,7 @@ export default function Settings() {
               onChange={(e) => setApiSettings({ ...apiSettings, jellyfin_url: e.target.value })}
               className="input"
               placeholder="http://your-jellyfin-server:8096"
+              disabled={!isAdmin()}
             />
             <p className="mt-1 text-xs text-gray-600 dark:text-gray-400">
               The URL of your Jellyfin media server (e.g., http://192.168.1.100:8096)
@@ -327,6 +343,7 @@ export default function Settings() {
                 onChange={(e) => setApiSettings({ ...apiSettings, jellyfin_api_key: e.target.value })}
                 className="input pr-10"
                 placeholder="Your Jellyfin API key"
+                disabled={!isAdmin()}
               />
               {originalApiSettings.jellyfin_api_key && (
                 <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 text-green-600 dark:text-green-400">
@@ -349,6 +366,7 @@ export default function Settings() {
                 onChange={(e) => setApiSettings({ ...apiSettings, comicvine_api_key: e.target.value })}
                 className="input pr-10"
                 placeholder="Your Comic Vine API key"
+                disabled={!isAdmin()}
               />
               {originalApiSettings.comicvine_api_key && (
                 <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 text-green-600 dark:text-green-400">
@@ -370,14 +388,16 @@ export default function Settings() {
             </p>
           </div>
 
-          <button
-            type="submit"
-            disabled={savingApiSettings}
-            className="btn btn-primary disabled:opacity-50"
-          >
-            <FiSave className="inline mr-2" />
-            {savingApiSettings ? 'Saving...' : 'Save API Settings'}
-          </button>
+          {isAdmin() && (
+            <button
+              type="submit"
+              disabled={savingApiSettings}
+              className="btn btn-primary disabled:opacity-50"
+            >
+              <FiSave className="inline mr-2" />
+              {savingApiSettings ? 'Saving...' : 'Save API Settings'}
+            </button>
+          )}
         </form>
       </div>
 
