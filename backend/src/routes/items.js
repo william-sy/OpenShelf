@@ -3,6 +3,7 @@ import { body, validationResult } from 'express-validator';
 import Papa from 'papaparse';
 import multer from 'multer';
 import { Item } from '../models/Item.js';
+import ReadingStatus from '../models/ReadingStatus.js';
 import { authenticateToken } from '../middleware/auth.js';
 
 // Configure multer for import file uploads
@@ -196,9 +197,20 @@ router.get('/export', (req, res) => {
     const { format = 'json' } = req.query;
     const items = Item.findByUserId(req.user.id, {});
     
+    // Fetch reading status for all items
+    const itemsWithReadingStatus = items.map(item => {
+      const readingStatus = ReadingStatus.getByItemAndUser(item.id, req.user.id);
+      return {
+        ...item,
+        reading_status: readingStatus?.status || null,
+        reading_start_date: readingStatus?.start_date || null,
+        reading_end_date: readingStatus?.end_date || null
+      };
+    });
+    
     if (format === 'csv') {
       // Convert JSON arrays/objects to strings for CSV export
-      const csvItems = items.map(item => ({
+      const csvItems = itemsWithReadingStatus.map(item => ({
         ...item,
         creators: typeof item.creators === 'string' ? item.creators : JSON.stringify(item.creators),
         tags: typeof item.tags === 'string' ? item.tags : JSON.stringify(item.tags),
@@ -219,8 +231,8 @@ router.get('/export', (req, res) => {
       res.setHeader('Content-Disposition', 'attachment; filename="openshelf-export.json"');
       res.json({
         exportDate: new Date().toISOString(),
-        itemCount: items.length,
-        items
+        itemCount: itemsWithReadingStatus.length,
+        items: itemsWithReadingStatus
       });
     }
   } catch (error) {
@@ -283,15 +295,38 @@ router.post('/import', upload.single('file'), (req, res) => {
           continue;
         }
 
+        // Extract reading status fields (not part of item schema)
+        const readingStatus = {
+          status: itemData.reading_status,
+          start_date: itemData.reading_start_date,
+          end_date: itemData.reading_end_date
+        };
+
         // Set user_id to current user
         const importItem = {
           ...itemData,
           user_id: req.user.id,
-          // Remove id to prevent conflicts
-          id: undefined
+          // Remove id and reading status fields to prevent conflicts
+          id: undefined,
+          reading_status: undefined,
+          reading_start_date: undefined,
+          reading_end_date: undefined
         };
 
-        Item.create(importItem);
+        const result = Item.create(importItem);
+        const newItemId = result.lastInsertRowid;
+        
+        // Import reading status if present
+        if (readingStatus.status && ['want_to_read', 'reading', 'read'].includes(readingStatus.status)) {
+          ReadingStatus.upsert(
+            newItemId, 
+            req.user.id, 
+            readingStatus.status,
+            readingStatus.start_date,
+            readingStatus.end_date
+          );
+        }
+        
         imported++;
       } catch (error) {
         skipped++;

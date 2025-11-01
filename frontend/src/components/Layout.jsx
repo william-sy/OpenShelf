@@ -5,6 +5,7 @@ import {
   FiBook, 
   FiHeart,
   FiTrendingUp,
+  FiBarChart2,
   FiSettings, 
   FiLogOut, 
   FiMenu,
@@ -28,6 +29,7 @@ export default function Layout() {
     { name: 'Library', href: '/items', icon: FiBook },
     { name: 'Wishlist', href: '/wishlist', icon: FiHeart },
     { name: 'Statistics', href: '/statistics', icon: FiTrendingUp },
+    { name: 'Reading Stats', href: '/reading-stats', icon: FiBarChart2 },
     { name: 'Settings', href: '/settings', icon: FiSettings },
   ];
 

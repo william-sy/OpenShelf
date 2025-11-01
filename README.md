@@ -15,8 +15,11 @@ A modern, self-hosted library management system for your physical media collecti
 - 🎬 **TMDB Integration** - Automatic movie and TV show metadata lookup for video media
 - 🎵 **Jellyfin Integration** - Connect to your Jellyfin media server to link and play media directly
 - ❤️ **Wishlist** - Track items you want to acquire with dedicated wishlist management
-- 📊 **Statistics & Insights** - Visual analytics with charts showing collection trends, top creators, and more
-- 💾 **Import/Export** - Backup and restore your collection data in CSV or JSON format
+- � **Reading Status Tracking** - Track your reading progress with "Want to Read", "Currently Reading", and "Read" statuses
+- 📅 **Reading Dates** - Record start and end dates for books to track reading history
+- 📊 **Reading Statistics** - Detailed analytics including books per month, pages per week, reading velocity, and completion trends
+- �📊 **Statistics & Insights** - Visual analytics with charts showing collection trends, top creators, and more
+- 💾 **Import/Export** - Backup and restore your collection data including reading status in CSV or JSON format
 - 🔍 **Advanced Search & Filters** - Multi-parameter filtering including tags, ratings, dates, and more
 - 🎨 **Modern UI** - Clean, responsive interface built with React and Tailwind CSS
 - 🌙 **Dark Mode** - Full dark mode support with persistent theme preference
@@ -219,8 +222,6 @@ docker-compose up -d
 
 ### Future Features
 - [ ] Lending system with due dates and reminders
-- [ ] reading status: "read", "Currently Reading", "Want to Read", "Finished", or "Library Only"
-- [ ] start / end date of reading -> statistics books per month, average pages per day.
 - [ ] book / music suggestions?
 - [ ] MusicBrainz integration for music metadata
 - [ ] RBAC (simple admin / reader)

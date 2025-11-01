@@ -16,6 +16,7 @@ import userRoutes from './routes/users.js';
 import lookupRoutes from './routes/lookup.js';
 import uploadRoutes from './routes/upload.js';
 import settingsRoutes from './routes/settings.js';
+import readingStatusRoutes from './routes/readingStatus.js';
 
 // Load environment variables
 dotenv.config();
@@ -67,6 +68,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/lookup', lookupRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/settings', settingsRoutes);
+app.use('/api/reading-status', readingStatusRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {

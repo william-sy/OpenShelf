@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useItemStore } from '../store/itemStore';
 import { useCurrencyStore } from '../store/currencyStore';
+import useReadingStatusStore from '../store/readingStatusStore';
 import toast from 'react-hot-toast';
-import { FiEdit2, FiTrash2, FiArrowLeft, FiCalendar, FiBook, FiMapPin, FiStar, FiHeart } from 'react-icons/fi';
+import { FiEdit2, FiTrash2, FiArrowLeft, FiCalendar, FiBook, FiMapPin, FiStar, FiHeart, FiBookOpen, FiCheckCircle, FiClock } from 'react-icons/fi';
 
 export default function ItemDetail() {
   const { id } = useParams();
@@ -11,20 +12,48 @@ export default function ItemDetail() {
   const getItemById = useItemStore((state) => state.getItemById);
   const { formatPrice } = useCurrencyStore();
   const { deleteItem, updateItem, fetchItems } = useItemStore();
+  const { fetchReadingStatus, updateReadingStatus, deleteReadingStatus, getReadingStatus } = useReadingStatusStore();
   const [item, setItem] = useState(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [readingStatus, setReadingStatus] = useState(null);
+  const [showStatusPicker, setShowStatusPicker] = useState(false);
 
   useEffect(() => {
     fetchItems().then(() => {
       const foundItem = getItemById(id);
       if (foundItem) {
         setItem(foundItem);
+        // Fetch reading status
+        fetchReadingStatus(id).then((status) => {
+          setReadingStatus(status.status ? status : null);
+        });
       } else {
         toast.error('Item not found');
         navigate('/items');
       }
     });
-  }, [id, fetchItems, getItemById, navigate]);
+  }, [id, fetchItems, getItemById, fetchReadingStatus, navigate]);
+
+  const handleReadingStatusChange = async (status, startDate = null, endDate = null) => {
+    try {
+      const updated = await updateReadingStatus(parseInt(id), status, startDate, endDate);
+      setReadingStatus(updated);
+      setShowStatusPicker(false);
+      toast.success('Reading status updated');
+    } catch (error) {
+      toast.error('Failed to update reading status');
+    }
+  };
+
+  const handleRemoveReadingStatus = async () => {
+    try {
+      await deleteReadingStatus(parseInt(id));
+      setReadingStatus(null);
+      toast.success('Reading status removed');
+    } catch (error) {
+      toast.error('Failed to remove reading status');
+    }
+  };
 
   const handleDelete = async () => {
     try {
@@ -183,6 +212,134 @@ export default function ItemDetail() {
                   <p className="font-medium text-gray-900 dark:text-gray-100">
                     {formatPrice(parseFloat(item.purchase_price))}
                   </p>
+                </div>
+              )}
+            </div>
+
+            {/* Reading Status */}
+            <div className="py-4 border-t border-gray-200 dark:border-gray-700">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400">Reading Status</h3>
+                {readingStatus && (
+                  <button
+                    onClick={handleRemoveReadingStatus}
+                    className="text-xs text-gray-500 hover:text-red-600 dark:hover:text-red-400"
+                  >
+                    Remove
+                  </button>
+                )}
+              </div>
+              
+              {readingStatus ? (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    {readingStatus.status === 'want_to_read' && (
+                      <>
+                        <FiClock className="text-yellow-500" />
+                        <span className="px-3 py-1 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 rounded-full text-sm font-medium">
+                          Want to Read
+                        </span>
+                      </>
+                    )}
+                    {readingStatus.status === 'reading' && (
+                      <>
+                        <FiBookOpen className="text-blue-500" />
+                        <span className="px-3 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded-full text-sm font-medium">
+                          Currently Reading
+                        </span>
+                      </>
+                    )}
+                    {readingStatus.status === 'read' && (
+                      <>
+                        <FiCheckCircle className="text-green-500" />
+                        <span className="px-3 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-full text-sm font-medium">
+                          Read
+                        </span>
+                      </>
+                    )}
+                    <button
+                      onClick={() => setShowStatusPicker(!showStatusPicker)}
+                      className="text-xs text-primary-600 dark:text-primary-400 hover:underline ml-auto"
+                    >
+                      Change
+                    </button>
+                  </div>
+                  
+                  {(readingStatus.start_date || readingStatus.end_date) && (
+                    <div className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
+                      {readingStatus.start_date && (
+                        <div className="flex items-center gap-2">
+                          <FiCalendar className="w-4 h-4" />
+                          <span>Started: {readingStatus.start_date}</span>
+                        </div>
+                      )}
+                      {readingStatus.end_date && (
+                        <div className="flex items-center gap-2">
+                          <FiCalendar className="w-4 h-4" />
+                          <span>Finished: {readingStatus.end_date}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  
+                  {showStatusPicker && (
+                    <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg space-y-2">
+                      <button
+                        onClick={() => handleReadingStatusChange('want_to_read')}
+                        className="w-full text-left px-3 py-2 rounded hover:bg-yellow-100 dark:hover:bg-yellow-900/30 text-sm"
+                      >
+                        <FiClock className="inline mr-2 text-yellow-500" />
+                        Want to Read
+                      </button>
+                      <button
+                        onClick={() => handleReadingStatusChange('reading')}
+                        className="w-full text-left px-3 py-2 rounded hover:bg-blue-100 dark:hover:bg-blue-900/30 text-sm"
+                      >
+                        <FiBookOpen className="inline mr-2 text-blue-500" />
+                        Currently Reading
+                      </button>
+                      <button
+                        onClick={() => handleReadingStatusChange('read')}
+                        className="w-full text-left px-3 py-2 rounded hover:bg-green-100 dark:hover:bg-green-900/30 text-sm"
+                      >
+                        <FiCheckCircle className="inline mr-2 text-green-500" />
+                        Read
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <button
+                  onClick={() => setShowStatusPicker(!showStatusPicker)}
+                  className="text-sm text-primary-600 dark:text-primary-400 hover:underline"
+                >
+                  + Set reading status
+                </button>
+              )}
+              
+              {!readingStatus && showStatusPicker && (
+                <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg space-y-2">
+                  <button
+                    onClick={() => handleReadingStatusChange('want_to_read')}
+                    className="w-full text-left px-3 py-2 rounded hover:bg-yellow-100 dark:hover:bg-yellow-900/30 text-sm"
+                  >
+                    <FiClock className="inline mr-2 text-yellow-500" />
+                    Want to Read
+                  </button>
+                  <button
+                    onClick={() => handleReadingStatusChange('reading')}
+                    className="w-full text-left px-3 py-2 rounded hover:bg-blue-100 dark:hover:bg-blue-900/30 text-sm"
+                  >
+                    <FiBookOpen className="inline mr-2 text-blue-500" />
+                    Currently Reading
+                  </button>
+                  <button
+                    onClick={() => handleReadingStatusChange('read')}
+                    className="w-full text-left px-3 py-2 rounded hover:bg-green-100 dark:hover:bg-green-900/30 text-sm"
+                  >
+                    <FiCheckCircle className="inline mr-2 text-green-500" />
+                    Read
+                  </button>
                 </div>
               )}
             </div>

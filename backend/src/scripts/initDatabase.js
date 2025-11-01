@@ -244,6 +244,23 @@ export function initializeDatabase() {
     )
   `);
 
+  // Create reading_status table for tracking reading progress
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS reading_status (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      item_id INTEGER NOT NULL,
+      user_id INTEGER NOT NULL,
+      status TEXT NOT NULL CHECK(status IN ('want_to_read', 'reading', 'read')),
+      start_date DATE,
+      end_date DATE,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      UNIQUE(item_id, user_id)
+    )
+  `);
+
   // Add comicvine_api_key column to existing api_settings table if needed
   const apiSettingsTableInfo = db.prepare("PRAGMA table_info(api_settings)").all();
   const hasComicVineKey = apiSettingsTableInfo.some(col => col.name === 'comicvine_api_key');
@@ -270,6 +287,8 @@ export function initializeDatabase() {
     CREATE INDEX IF NOT EXISTS idx_items_title ON items(title);
     CREATE INDEX IF NOT EXISTS idx_lending_item_id ON lending(item_id);
     CREATE INDEX IF NOT EXISTS idx_api_settings_user_id ON api_settings(user_id);
+    CREATE INDEX IF NOT EXISTS idx_reading_status_item_user ON reading_status(item_id, user_id);
+    CREATE INDEX IF NOT EXISTS idx_reading_status_user_status ON reading_status(user_id, status);
   `);
 
   // Create default admin user if not exists

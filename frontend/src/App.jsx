@@ -15,6 +15,7 @@ import EditItem from './pages/EditItem';
 import ItemDetail from './pages/ItemDetail';
 import Wishlist from './pages/Wishlist';
 import Statistics from './pages/Statistics';
+import ReadingStats from './pages/ReadingStats';
 import Settings from './pages/Settings';
 
 // Components
@@ -59,6 +60,7 @@ function App() {
           <Route path="items/:id/edit" element={<EditItem />} />
           <Route path="wishlist" element={<Wishlist />} />
           <Route path="statistics" element={<Statistics />} />
+          <Route path="reading-stats" element={<ReadingStats />} />
           <Route path="settings" element={<Settings />} />
         </Route>
       </Routes>
