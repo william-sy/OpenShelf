@@ -202,7 +202,7 @@ docker-compose up -d
 
 ## Roadmap
 
-### v1.0 (Current)
+### v1.0.4 (Current)
 - [x] User authentication with display names
 - [x] Book & Comic management with ISBN lookup
 - [x] Comic Vine API integration for comic metadata
