@@ -73,6 +73,56 @@ router.get('/', (req, res) => {
   }
 });
 
+// Export items - CSV or JSON format (must be before /:id route)
+router.get('/export', (req, res) => {
+  try {
+    const { format = 'json' } = req.query;
+    const items = Item.findAll({}); // Shared library: export all items
+    
+    // Fetch reading status for all items for current user
+    const itemsWithReadingStatus = items.map(item => {
+      const readingStatus = ReadingStatus.getByItemAndUser(item.id, req.user.id);
+      return {
+        ...item,
+        reading_status: readingStatus?.status || null,
+        reading_start_date: readingStatus?.start_date || null,
+        reading_end_date: readingStatus?.end_date || null
+      };
+    });
+    
+    if (format === 'csv') {
+      // Convert JSON arrays/objects to strings for CSV export
+      const csvItems = itemsWithReadingStatus.map(item => ({
+        ...item,
+        creators: typeof item.creators === 'string' ? item.creators : JSON.stringify(item.creators),
+        tags: typeof item.tags === 'string' ? item.tags : JSON.stringify(item.tags),
+        metadata: typeof item.metadata === 'string' ? item.metadata : JSON.stringify(item.metadata),
+        wishlist: item.wishlist ? 'true' : 'false'
+      }));
+      
+      // Set CSV headers
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', 'attachment; filename="openshelf-export.csv"');
+      
+      // Send CSV data
+      const csv = Papa.unparse(csvItems);
+      res.send(csv);
+    } else {
+      // JSON export
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Content-Disposition', 'attachment; filename="openshelf-export.json"');
+      res.json({
+        exportDate: new Date().toISOString(),
+        itemCount: itemsWithReadingStatus.length,
+        items: itemsWithReadingStatus
+      });
+    }
+  } catch (error) {
+    console.error('Error exporting items:', error);
+    res.status(500).json({ error: 'Failed to export items' });
+  }
+});
+
 // Get item by ID (shared library - all users can view)
 router.get('/:id', (req, res) => {
   try {
@@ -187,56 +237,6 @@ router.get('/stats/detailed', (req, res) => {
   } catch (error) {
     console.error('Error fetching detailed stats:', error);
     res.status(500).json({ error: 'Failed to fetch detailed statistics' });
-  }
-});
-
-// Export items - CSV or JSON format
-router.get('/export', (req, res) => {
-  try {
-    const { format = 'json' } = req.query;
-    const items = Item.findByUserId(req.user.id, {});
-    
-    // Fetch reading status for all items
-    const itemsWithReadingStatus = items.map(item => {
-      const readingStatus = ReadingStatus.getByItemAndUser(item.id, req.user.id);
-      return {
-        ...item,
-        reading_status: readingStatus?.status || null,
-        reading_start_date: readingStatus?.start_date || null,
-        reading_end_date: readingStatus?.end_date || null
-      };
-    });
-    
-    if (format === 'csv') {
-      // Convert JSON arrays/objects to strings for CSV export
-      const csvItems = itemsWithReadingStatus.map(item => ({
-        ...item,
-        creators: typeof item.creators === 'string' ? item.creators : JSON.stringify(item.creators),
-        tags: typeof item.tags === 'string' ? item.tags : JSON.stringify(item.tags),
-        metadata: typeof item.metadata === 'string' ? item.metadata : JSON.stringify(item.metadata),
-        wishlist: item.wishlist ? 'true' : 'false'
-      }));
-      
-      // Set CSV headers
-      res.setHeader('Content-Type', 'text/csv');
-      res.setHeader('Content-Disposition', 'attachment; filename="openshelf-export.csv"');
-      
-      // Send CSV data
-      const csv = Papa.unparse(csvItems);
-      res.send(csv);
-    } else {
-      // JSON export
-      res.setHeader('Content-Type', 'application/json');
-      res.setHeader('Content-Disposition', 'attachment; filename="openshelf-export.json"');
-      res.json({
-        exportDate: new Date().toISOString(),
-        itemCount: itemsWithReadingStatus.length,
-        items: itemsWithReadingStatus
-      });
-    }
-  } catch (error) {
-    console.error('Error exporting items:', error);
-    res.status(500).json({ error: 'Failed to export items' });
   }
 });
 

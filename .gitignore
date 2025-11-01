@@ -2,3 +2,5 @@
 .env.local
 .env.development
 .env.production
+build-and-push.sh
+docker-compose-prod.yml
