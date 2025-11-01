@@ -224,7 +224,6 @@ docker-compose up -d
 - [ ] Lending system with due dates and reminders
 - [ ] book / music suggestions?
 - [ ] MusicBrainz integration for music metadata
-- [ ] RBAC (simple admin / reader)
 - [ ] Mobile app (iOS/Android)? (browser works fine for now)
 
 ## License
