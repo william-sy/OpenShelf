@@ -254,8 +254,17 @@ export default function AddItem() {
   };
 
   const handleJellyfinSelect = (result) => {
+    // Map Jellyfin types to our types
+    let itemType = formData.type; // Keep current type by default
+    if (result.type === 'Movie' || result.type === 'Episode') {
+      itemType = 'dvd'; // Default to DVD for video content
+    } else if (result.type === 'Audio' || result.type === 'MusicAlbum') {
+      itemType = 'cd'; // Default to CD for audio content
+    }
+    
     setFormData({
       ...formData,
+      type: itemType,
       title: result.title || formData.title,
       subtitle: result.subtitle || formData.subtitle,
       description: result.description || formData.description,

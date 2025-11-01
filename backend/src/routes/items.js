@@ -143,7 +143,7 @@ router.get('/:id', (req, res) => {
 // Create new item (admin only)
 router.post('/',
   requireAdmin,
-  body('type').isIn(['book', 'comic', 'cd', 'dvd', 'other']),
+  body('type').isIn(['book', 'comic', 'cd', 'vinyl', 'dvd', 'bluray', 'ebook', 'other']),
   body('title').trim().notEmpty(),
   (req, res) => {
     const errors = validationResult(req);
