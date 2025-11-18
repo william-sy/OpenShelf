@@ -30,7 +30,8 @@ export const Item = {
       jellyfin_url,
       file_path,
       comicvine_id,
-      wishlist
+      wishlist,
+      favorite
     } = itemData;
 
     const stmt = db.prepare(`
@@ -39,8 +40,8 @@ export const Item = {
         publish_date, description, cover_url, page_count, language,
         metadata, notes, tags, rating, condition, location,
         purchase_date, purchase_price, tmdb_id, jellyfin_id, jellyfin_url, file_path,
-        comicvine_id, wishlist
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        comicvine_id, wishlist, favorite
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     // Convert old authors format to creators if needed
@@ -73,7 +74,8 @@ export const Item = {
       jellyfin_url || null,
       file_path || null,
       comicvine_id || null,
-      wishlist ? 1 : 0
+      wishlist ? 1 : 0,
+      favorite ? 1 : 0
     );
 
     return this.findById(result.lastInsertRowid);
@@ -100,6 +102,12 @@ export const Item = {
     if (filters.wishlist !== undefined) {
       query += ' AND wishlist = ?';
       params.push(filters.wishlist ? 1 : 0);
+    }
+
+    // Favorite filter
+    if (filters.favorite !== undefined) {
+      query += ' AND favorite = ?';
+      params.push(filters.favorite ? 1 : 0);
     }
 
     // Rating filter (exact or range)
@@ -207,6 +215,12 @@ export const Item = {
     if (filters.wishlist !== undefined) {
       query += ' AND wishlist = ?';
       params.push(filters.wishlist ? 1 : 0);
+    }
+
+    // Favorite filter
+    if (filters.favorite !== undefined) {
+      query += ' AND favorite = ?';
+      params.push(filters.favorite ? 1 : 0);
     }
 
     // Rating filter (exact or range)
@@ -329,7 +343,7 @@ export const Item = {
       'publish_date', 'description', 'cover_url', 'page_count', 'language',
       'metadata', 'notes', 'tags', 'rating', 'condition', 'location',
       'purchase_date', 'purchase_price', 'tmdb_id', 'jellyfin_id', 'jellyfin_url', 'file_path',
-      'comicvine_id', 'wishlist'
+      'comicvine_id', 'wishlist', 'favorite'
     ];
 
     const updates = [];
@@ -341,7 +355,7 @@ export const Item = {
         // Stringify arrays and objects
         if (key === 'creators' || key === 'authors' || key === 'tags' || key === 'metadata') {
           values.push(value ? JSON.stringify(value) : null);
-        } else if (key === 'wishlist') {
+        } else if (key === 'wishlist' || key === 'favorite') {
           // Convert to boolean (0 or 1)
           values.push(value ? 1 : 0);
         } else if (value === '' || value === undefined) {
@@ -465,9 +479,21 @@ export const Item = {
     // Wishlist count
     const wishlistCount = items.filter(item => item.wishlist).length;
 
+    // Favorite count
+    const favoriteCount = items.filter(item => item.favorite).length;
+
+    // Average rating (only count items with ratings)
+    const ratedItems = items.filter(item => item.rating > 0);
+    const averageRating = ratedItems.length > 0
+      ? Math.round((ratedItems.reduce((sum, item) => sum + item.rating, 0) / ratedItems.length) * 10) / 10
+      : 0;
+
     return {
       total: items.length,
       wishlistCount,
+      favoriteCount,
+      averageRating,
+      ratedItemsCount: ratedItems.length,
       byType,
       byRating,
       byCondition,

@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import toast from 'react-hot-toast';
-import { FiBook, FiUser, FiLock, FiMail } from 'react-icons/fi';
+import api from '../services/api';
+import { FiBook, FiUser, FiLock, FiMail, FiAlertCircle } from 'react-icons/fi';
 
 export default function Register() {
   const [formData, setFormData] = useState({
@@ -13,8 +14,28 @@ export default function Register() {
     confirmPassword: '',
   });
   const [loading, setLoading] = useState(false);
+  const [registrationAllowed, setRegistrationAllowed] = useState(true);
+  const [checkingStatus, setCheckingStatus] = useState(true);
   const navigate = useNavigate();
   const register = useAuthStore((state) => state.register);
+
+  useEffect(() => {
+    // Check if registration is allowed
+    const checkRegistrationStatus = async () => {
+      try {
+        const response = await api.get('/api/settings/registration-status');
+        setRegistrationAllowed(response.data.allowed);
+      } catch (error) {
+        console.error('Failed to check registration status:', error);
+        // Default to true if check fails
+        setRegistrationAllowed(true);
+      } finally {
+        setCheckingStatus(false);
+      }
+    };
+
+    checkRegistrationStatus();
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -60,7 +81,31 @@ export default function Register() {
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8">
           <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 dark:text-gray-100 mb-6">Sign Up</h2>
           
-          <form onSubmit={handleSubmit} className="space-y-4">
+          {checkingStatus ? (
+            <div className="text-center py-8">
+              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mb-4"></div>
+              <p className="text-gray-600 dark:text-gray-400">Checking registration status...</p>
+            </div>
+          ) : !registrationAllowed ? (
+            <div className="text-center py-8">
+              <div className="inline-flex items-center justify-center w-16 h-16 bg-red-100 dark:bg-red-900/30 rounded-full mb-4">
+                <FiAlertCircle className="w-8 h-8 text-red-600 dark:text-red-400" />
+              </div>
+              <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">
+                Registration Disabled
+              </h3>
+              <p className="text-gray-600 dark:text-gray-400 mb-6">
+                New user registration is currently disabled. Please contact an administrator to create an account for you.
+              </p>
+              <Link
+                to="/login"
+                className="btn btn-primary inline-flex items-center gap-2"
+              >
+                Go to Login
+              </Link>
+            </div>
+          ) : (
+            <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="label">Username</label>
               <div className="relative">
@@ -152,6 +197,7 @@ export default function Register() {
               {loading ? 'Creating account...' : 'Create Account'}
             </button>
           </form>
+          )}
 
           <div className="mt-6 text-center">
             <p className="text-sm text-gray-600 dark:text-gray-400 dark:text-gray-400">

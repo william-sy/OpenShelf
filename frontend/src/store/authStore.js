@@ -54,6 +54,16 @@ export const useAuthStore = create(
         return user?.role === 'admin';
       },
 
+      canModifyItems: () => {
+        const { user } = get();
+        return user?.role === 'admin' || user?.role === 'user';
+      },
+
+      isReader: () => {
+        const { user } = get();
+        return user?.role === 'reader';
+      },
+
       hasRole: (...roles) => {
         const { user } = get();
         return user && roles.includes(user.role);

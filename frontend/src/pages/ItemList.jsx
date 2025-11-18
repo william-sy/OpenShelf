@@ -1,18 +1,36 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useItemStore } from '../store/itemStore';
 import { useAuthStore } from '../store/authStore';
-import { FiBook, FiSearch, FiFilter, FiPlus, FiImage, FiHeart, FiDownload, FiUpload, FiLock } from 'react-icons/fi';
+import { FiBook, FiSearch, FiFilter, FiPlus, FiImage, FiHeart, FiDownload, FiUpload, FiLock, FiStar } from 'react-icons/fi';
 import toast from 'react-hot-toast';
-import api from '../services/api';
+import api, { API_URL } from '../services/api';
+
+// Helper to convert relative API URLs to absolute URLs
+const getImageUrl = (url) => {
+  if (!url) return null;
+  if (url.startsWith('http://') || url.startsWith('https://')) return url;
+  if (url.startsWith('/api/')) return `${API_URL}${url}`;
+  if (url.startsWith('/')) return `${API_URL}${url}`;
+  return url;
+};
 
 export default function ItemList() {
   const { items, loading, filter, setFilter, fetchItems } = useItemStore();
-  const { isAdmin } = useAuthStore();
+  const { isAdmin, canModifyItems } = useAuthStore();
+  const [searchParams] = useSearchParams();
   const [searchInput, setSearchInput] = useState(filter.search);
   const [showImportModal, setShowImportModal] = useState(false);
   const [importFile, setImportFile] = useState(null);
   const [importing, setImporting] = useState(false);
+
+  // Apply filter from URL params on mount
+  useEffect(() => {
+    const typeParam = searchParams.get('type');
+    if (typeParam && typeParam !== filter.type) {
+      setFilter({ type: typeParam });
+    }
+  }, [searchParams, setFilter]); // Only run when URL changes
 
   useEffect(() => {
     fetchItems();
@@ -38,6 +56,10 @@ export default function ItemList() {
 
   const handleWishlistFilter = (value) => {
     setFilter({ wishlist: filter.wishlist === value ? null : value });
+  };
+
+  const handleFavoriteFilter = (value) => {
+    setFilter({ favorite: filter.favorite === value ? null : value });
   };
 
   const handleExport = async (format) => {
@@ -112,7 +134,7 @@ export default function ItemList() {
           <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">Library</h1>
           <p className="text-gray-600 dark:text-gray-400 mt-1">
             {items.length} items in your collection
-            {!isAdmin() && (
+            {!canModifyItems() && (
               <span className="ml-3 text-sm inline-flex items-center gap-1 text-yellow-600 dark:text-yellow-500">
                 <FiLock className="text-xs" />
                 Read-only access
@@ -141,15 +163,17 @@ export default function ItemList() {
               </button>
             </div>
           </div>
-          {isAdmin() && (
+          {canModifyItems() && (
             <>
-              <button 
-                onClick={() => setShowImportModal(true)}
-                className="btn btn-secondary flex items-center gap-2"
-              >
-                <FiUpload />
-                Import
-              </button>
+              {isAdmin() && (
+                <button 
+                  onClick={() => setShowImportModal(true)}
+                  className="btn btn-secondary flex items-center gap-2"
+                >
+                  <FiUpload />
+                  Import
+                </button>
+              )}
               <Link to="/items/add" className="btn btn-primary flex items-center gap-2">
                 <FiPlus />
                 Add Item
@@ -179,6 +203,17 @@ export default function ItemList() {
 
         {/* Quick Filters */}
         <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => handleFavoriteFilter(true)}
+            className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              filter.favorite === true
+                ? 'bg-red-600 text-white'
+                : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+            }`}
+          >
+            <FiHeart className={filter.favorite === true ? 'fill-current' : ''} />
+            Favorites Only
+          </button>
           <button
             onClick={() => handleWishlistFilter(true)}
             className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
@@ -255,7 +290,7 @@ export default function ItemList() {
             >
               {item.cover_url ? (
                 <img
-                  src={item.cover_url}
+                  src={getImageUrl(item.cover_url)}
                   alt={item.title}
                   className="w-full h-48 object-cover rounded-lg mb-3"
                 />
@@ -268,8 +303,20 @@ export default function ItemList() {
                 {item.title}
               </h3>
               <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-1 mb-2">
-                {item.authors?.join(', ') || 'Unknown'}
+                {item.creators?.map(c => c.name).join(', ') || item.authors?.join(', ') || 'Unknown'}
               </p>
+              <div className="flex items-center gap-2 mb-2">
+                {item.rating > 0 && (
+                  <div className="flex items-center gap-1">
+                    {[...Array(item.rating)].map((_, i) => (
+                      <FiStar key={i} className="w-3 h-3 text-yellow-500 fill-current" />
+                    ))}
+                  </div>
+                )}
+                {item.favorite && (
+                  <FiHeart className="w-3 h-3 text-red-500 fill-current" title="Favorite" />
+                )}
+              </div>
               <div className="flex flex-wrap gap-1">
                 <span className="inline-block px-2 py-1 bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400 text-xs rounded">
                   {item.type}

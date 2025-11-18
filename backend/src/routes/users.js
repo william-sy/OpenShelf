@@ -10,7 +10,9 @@ router.use(authenticateToken);
 // Get current user's preferences
 router.get('/me/preferences', (req, res) => {
   try {
+    console.log('GET /me/preferences - User ID:', req.user.id);
     const user = User.findById(req.user.id);
+    console.log('GET /me/preferences - User found:', user);
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
@@ -28,15 +30,18 @@ router.get('/me/preferences', (req, res) => {
 router.put('/me/preferences', (req, res) => {
   try {
     const { currency } = req.body;
+    console.log('PUT /me/preferences - User ID:', req.user.id, 'Currency:', currency);
     
     // Update user's currency preference
     const success = User.update(req.user.id, { currency });
+    console.log('PUT /me/preferences - Update success:', success);
     
     if (!success) {
       return res.status(404).json({ error: 'User not found' });
     }
 
     const user = User.findById(req.user.id);
+    console.log('PUT /me/preferences - User after update:', user);
     res.json({
       message: 'Preferences updated successfully',
       currency: user.currency || 'USD'

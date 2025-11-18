@@ -1,6 +1,7 @@
 import express from 'express';
 import { upload } from '../middleware/upload.js';
 import { authenticateToken } from '../middleware/auth.js';
+import { requireAdminOrUser } from '../middleware/rbac.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -9,8 +10,8 @@ const __dirname = path.dirname(__filename);
 
 const router = express.Router();
 
-// Upload image
-router.post('/', authenticateToken, upload.single('image'), (req, res) => {
+// Upload image (admin or user can upload)
+router.post('/', authenticateToken, requireAdminOrUser, upload.single('image'), (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No file uploaded' });

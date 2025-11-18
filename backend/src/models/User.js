@@ -11,7 +11,7 @@ export const User = {
   },
 
   findById(id) {
-    return db.prepare('SELECT id, username, email, display_name, role, created_at FROM users WHERE id = ?').get(id);
+    return db.prepare('SELECT id, username, email, display_name, role, currency, created_at FROM users WHERE id = ?').get(id);
   },
 
   findByUsername(username) {
@@ -27,7 +27,7 @@ export const User = {
   },
 
   update(id, fields) {
-    const allowed = ['username', 'email', 'role', 'display_name'];
+    const allowed = ['username', 'email', 'role', 'display_name', 'profile_picture', 'currency'];
     const updates = [];
     const values = [];
 
@@ -106,6 +106,7 @@ export const User = {
       SELECT 
         COUNT(DISTINCT i.id) as total_items,
         COUNT(DISTINCT CASE WHEN i.wishlist = 1 THEN i.id END) as wishlist_items,
+        COUNT(DISTINCT CASE WHEN i.favorite = 1 THEN i.id END) as favorite_items,
         COUNT(DISTINCT rs.id) as reading_statuses,
         COUNT(DISTINCT CASE WHEN rs.status = 'read' THEN rs.id END) as books_read
       FROM users u
@@ -115,6 +116,16 @@ export const User = {
       GROUP BY u.id
     `).get(id);
     
-    return stats || { total_items: 0, wishlist_items: 0, reading_statuses: 0, books_read: 0 };
+    return stats || { total_items: 0, wishlist_items: 0, favorite_items: 0, reading_statuses: 0, books_read: 0 };
+  },
+
+  // Reset user password (admin operation)
+  resetUserPassword(id, passwordHash) {
+    const stmt = db.prepare(`
+      UPDATE users 
+      SET password_hash = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `);
+    return stmt.run(passwordHash, id).changes > 0;
   }
 };

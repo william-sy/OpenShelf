@@ -2,10 +2,18 @@ import express from 'express';
 import { body, validationResult } from 'express-validator';
 import Papa from 'papaparse';
 import multer from 'multer';
+import axios from 'axios';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { Item } from '../models/Item.js';
 import ReadingStatus from '../models/ReadingStatus.js';
 import { authenticateToken } from '../middleware/auth.js';
-import { requireAdmin } from '../middleware/rbac.js';
+import { requireAdmin, requireAdminOrUser } from '../middleware/rbac.js';
+import { ApiSettings } from '../models/ApiSettings.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Configure multer for import file uploads
 const upload = multer({ 
@@ -17,6 +25,56 @@ const router = express.Router();
 
 // All routes require authentication
 router.use(authenticateToken);
+
+// Helper function to download Jellyfin images and save them locally
+async function downloadJellyfinImage(cover_url, userId) {
+  if (!cover_url || !cover_url.startsWith('/api/lookup/jellyfin/image/')) {
+    return cover_url; // Not a Jellyfin proxy URL, return as-is
+  }
+
+  try {
+    // Extract Jellyfin item ID from URL
+    const jellyfinItemId = cover_url.split('/').pop();
+    
+    // Get user's Jellyfin settings
+    const settings = ApiSettings.findByUserId(userId);
+    if (!settings?.jellyfin_url || !settings?.jellyfin_api_key) {
+      console.warn('Jellyfin not configured, keeping proxy URL');
+      return cover_url;
+    }
+
+    // Download image from Jellyfin
+    const imageUrl = `${settings.jellyfin_url}/Items/${jellyfinItemId}/Images/Primary`;
+    const response = await axios.get(imageUrl, {
+      params: { api_key: settings.jellyfin_api_key },
+      responseType: 'arraybuffer',
+      timeout: 10000
+    });
+
+    // Determine file extension from content type
+    const contentType = response.headers['content-type'];
+    const ext = contentType.includes('jpeg') ? 'jpg' : contentType.includes('png') ? 'png' : 'jpg';
+    
+    // Generate unique filename
+    const filename = `jellyfin_${jellyfinItemId}.${ext}`;
+    const uploadsDir = path.join(__dirname, '../../uploads');
+    
+    // Ensure uploads directory exists
+    if (!fs.existsSync(uploadsDir)) {
+      fs.mkdirSync(uploadsDir, { recursive: true });
+    }
+
+    // Save image to uploads folder
+    const filepath = path.join(uploadsDir, filename);
+    fs.writeFileSync(filepath, response.data);
+
+    // Return the uploaded file URL
+    return `/uploads/${filename}`;
+  } catch (error) {
+    console.error('Failed to download Jellyfin image:', error.message);
+    return cover_url; // Fall back to proxy URL on error
+  }
+}
 
 // Get all items (shared library - all users see all items)
 router.get('/', (req, res) => {
@@ -140,18 +198,23 @@ router.get('/:id', (req, res) => {
   }
 });
 
-// Create new item (admin only)
+// Create new item (admin or user can create)
 router.post('/',
-  requireAdmin,
+  requireAdminOrUser,
   body('type').isIn(['book', 'comic', 'cd', 'vinyl', 'dvd', 'bluray', 'ebook', 'other']),
   body('title').trim().notEmpty(),
-  (req, res) => {
+  async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       return res.status(400).json({ errors: errors.array() });
     }
 
     try {
+      // Download Jellyfin image if needed
+      if (req.body.cover_url && req.body.cover_url.startsWith('/api/lookup/jellyfin/image/')) {
+        req.body.cover_url = await downloadJellyfinImage(req.body.cover_url, req.user.id);
+      }
+
       const itemData = {
         ...req.body,
         user_id: req.user.id
@@ -166,8 +229,8 @@ router.post('/',
   }
 );
 
-// Update item (admin only)
-router.put('/:id', requireAdmin, (req, res) => {
+// Update item (admin or user can update)
+router.put('/:id', requireAdminOrUser, async (req, res) => {
   try {
     const item = Item.findById(req.params.id);
     
@@ -178,6 +241,11 @@ router.put('/:id', requireAdmin, (req, res) => {
     // Check ownership
     if (item.user_id !== req.user.id && req.user.role !== 'admin') {
       return res.status(403).json({ error: 'Access denied' });
+    }
+
+    // Download Jellyfin image if needed
+    if (req.body.cover_url && req.body.cover_url.startsWith('/api/lookup/jellyfin/image/')) {
+      req.body.cover_url = await downloadJellyfinImage(req.body.cover_url, req.user.id);
     }
 
     console.log('Updating item:', req.params.id, 'with data:', req.body);
@@ -197,7 +265,8 @@ router.put('/:id', requireAdmin, (req, res) => {
 });
 
 // Delete item (admin only)
-router.delete('/:id', requireAdmin, (req, res) => {
+// Delete item (admin or user can delete)
+router.delete('/:id', requireAdminOrUser, (req, res) => {
   try {
     const item = Item.findById(req.params.id);
     

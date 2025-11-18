@@ -17,6 +17,24 @@ const JELLYFIN_API_KEY_DEFAULT = process.env.JELLYFIN_API_KEY;
 const COMICVINE_API_KEY_DEFAULT = process.env.COMICVINE_API_KEY;
 const COMICVINE_BASE_URL = 'https://comicvine.gamespot.com/api';
 
+// MusicBrainz API configuration
+const MUSICBRAINZ_BASE_URL = 'https://musicbrainz.org/ws/2';
+const COVERART_BASE_URL = 'https://coverartarchive.org';
+const MUSICBRAINZ_USER_AGENT = 'OpenShelf/1.5.0 (https://github.com/william-sy/openshelf)';
+
+// Rate limiting for MusicBrainz (1 request per second)
+let lastMusicBrainzRequest = 0;
+const MUSICBRAINZ_RATE_LIMIT = 1000; // milliseconds
+
+async function musicBrainzRateLimit() {
+  const now = Date.now();
+  const timeSinceLastRequest = now - lastMusicBrainzRequest;
+  if (timeSinceLastRequest < MUSICBRAINZ_RATE_LIMIT) {
+    await new Promise(resolve => setTimeout(resolve, MUSICBRAINZ_RATE_LIMIT - timeSinceLastRequest));
+  }
+  lastMusicBrainzRequest = Date.now();
+}
+
 // All routes require authentication
 router.use(authenticateToken);
 
@@ -297,11 +315,11 @@ router.get('/jellyfin/search', async (req, res) => {
 
     // Map our types to Jellyfin types
     const jellyfinType = {
-      'cd': 'Audio',
-      'vinyl': 'Audio',
+      'cd': 'MusicAlbum',
+      'vinyl': 'MusicAlbum',
       'dvd': 'Movie,Episode',
       'bluray': 'Movie,Episode'
-    }[type] || 'Movie,Audio';
+    }[type] || 'Movie,MusicAlbum';
 
     const response = await axios.get(`${userSettings.jellyfin_url}/Items`, {
       params: {
@@ -320,25 +338,219 @@ router.get('/jellyfin/search', async (req, res) => {
       return res.json({ results: [] });
     }
 
-    const results = response.data.Items.map(item => ({
-      jellyfin_id: item.Id,
-      title: item.Name,
-      subtitle: item.Album || item.AlbumArtist,
-      year: item.ProductionYear,
-      description: item.Overview,
-      cover_url: item.ImageTags?.Primary 
-        ? `${userSettings.jellyfin_url}/Items/${item.Id}/Images/Primary?api_key=${userSettings.jellyfin_api_key}`
-        : null,
-      jellyfin_url: `${userSettings.jellyfin_url}/web/index.html#!/details?id=${item.Id}`,
-      type: item.Type,
-      creators: item.Artists || item.People?.map(p => ({ name: p.Name, role: p.Role })) || []
+    // Enhance results with additional track info for albums
+    const enhancedResults = await Promise.all(response.data.Items.map(async item => {
+      // Format creators properly
+      let creators = [];
+      if (item.AlbumArtists && item.AlbumArtists.length > 0) {
+        // For MusicAlbums, use AlbumArtists
+        creators = item.AlbumArtists.map(artist => ({ name: artist.Name, role: 'artist' }));
+      } else if (item.Artists && Array.isArray(item.Artists)) {
+        // Artists might be an array of strings
+        creators = item.Artists.map(name => ({ name, role: 'artist' }));
+      } else if (item.People) {
+        // For movies/shows
+        creators = item.People.map(p => ({ name: p.Name, role: p.Role || 'unknown' }));
+      }
+
+      const result = {
+        jellyfin_id: item.Id,
+        title: item.Name,
+        subtitle: item.AlbumArtist || (item.AlbumArtists && item.AlbumArtists.length > 0 ? item.AlbumArtists[0].Name : null),
+        year: item.ProductionYear,
+        description: item.Overview,
+        // For search results preview: direct Jellyfin URL (temporary, includes API key)
+        cover_url: item.ImageTags?.Primary 
+          ? `${userSettings.jellyfin_url}/Items/${item.Id}/Images/Primary?api_key=${userSettings.jellyfin_api_key}`
+          : null,
+        // Store the proxy path for later download when item is saved
+        cover_url_proxy: item.ImageTags?.Primary 
+          ? `/api/lookup/jellyfin/image/${item.Id}`
+          : null,
+        jellyfin_url: `${userSettings.jellyfin_url}/web/index.html#!/details?id=${item.Id}`,
+        type: item.Type,
+        creators: creators
+      };
+      
+      // Fetch track list for audio albums
+      if (item.Type === 'MusicAlbum' && ['cd', 'vinyl'].includes(type)) {
+        try {
+          const tracksResponse = await axios.get(`${userSettings.jellyfin_url}/Items`, {
+            params: {
+              ParentId: item.Id,
+              SortBy: 'SortName',
+              SortOrder: 'Ascending',
+              Recursive: false
+            },
+            headers: {
+              'X-Emby-Token': userSettings.jellyfin_api_key
+            },
+            timeout: 5000
+          });
+          
+          if (tracksResponse.data.Items) {
+            result.track_count = tracksResponse.data.Items.length;
+            result.tracks = tracksResponse.data.Items.map(track => ({
+              number: track.IndexNumber,
+              title: track.Name,
+              duration: track.RunTimeTicks ? Math.round(track.RunTimeTicks / 10000000) : null // Convert from ticks to seconds
+            }));
+            
+            // Add total duration
+            const totalSeconds = result.tracks.reduce((sum, track) => sum + (track.duration || 0), 0);
+            result.total_duration = totalSeconds;
+          }
+        } catch (trackError) {
+          console.error('Failed to fetch tracks:', trackError.message);
+          // Continue without track info
+        }
+      }
+      
+      return result;
     }));
 
-    res.json({ results });
+    res.json({ results: enhancedResults });
 
   } catch (error) {
     console.error('Jellyfin search error:', error.response?.data || error.message);
     res.status(500).json({ error: 'Jellyfin search failed' });
+  }
+});
+
+// Proxy endpoint for Jellyfin images (to avoid exposing API key)
+router.get('/jellyfin/image/:itemId', async (req, res) => {
+  try {
+    const { itemId } = req.params;
+    const { type = 'Primary', maxWidth, maxHeight } = req.query;
+    
+    const userSettings = getUserApiSettings(req.user.id);
+    
+    if (!userSettings.jellyfin_url || !userSettings.jellyfin_api_key) {
+      return res.status(503).json({ error: 'Jellyfin not configured' });
+    }
+
+    const imageUrl = `${userSettings.jellyfin_url}/Items/${itemId}/Images/${type}`;
+    const params = {
+      api_key: userSettings.jellyfin_api_key
+    };
+    if (maxWidth) params.maxWidth = maxWidth;
+    if (maxHeight) params.maxHeight = maxHeight;
+
+    const response = await axios.get(imageUrl, {
+      params,
+      responseType: 'arraybuffer',
+      timeout: 10000
+    });
+
+    res.set('Content-Type', response.headers['content-type']);
+    res.set('Cache-Control', 'public, max-age=86400'); // Cache for 24 hours
+    res.send(response.data);
+
+  } catch (error) {
+    console.error('Jellyfin image proxy error:', error.message);
+    res.status(error.response?.status || 500).json({ error: 'Failed to fetch image' });
+  }
+});
+
+// Resync item metadata from Jellyfin
+router.get('/jellyfin/resync/:jellyfinId', async (req, res) => {
+  try {
+    const { jellyfinId } = req.params;
+    const { type } = req.query; // cd, vinyl, dvd, bluray
+
+    const userSettings = getUserApiSettings(req.user.id);
+    
+    if (!userSettings.jellyfin_url || !userSettings.jellyfin_api_key) {
+      return res.status(503).json({ 
+        error: 'Jellyfin not configured',
+        message: 'Please configure your Jellyfin URL and API key in Settings'
+      });
+    }
+
+    // First, get the user ID from Jellyfin
+    const userResponse = await axios.get(`${userSettings.jellyfin_url}/Users`, {
+      headers: {
+        'X-Emby-Token': userSettings.jellyfin_api_key
+      },
+      timeout: 5000
+    });
+    
+    const jellyfinUserId = userResponse.data[0]?.Id;
+    if (!jellyfinUserId) {
+      return res.status(500).json({ error: 'Could not determine Jellyfin user ID' });
+    }
+    
+    // Fetch item details from Jellyfin using user-specific endpoint
+    const response = await axios.get(`${userSettings.jellyfin_url}/Users/${jellyfinUserId}/Items/${jellyfinId}`, {
+      headers: {
+        'X-Emby-Token': userSettings.jellyfin_api_key
+      },
+      timeout: 5000
+    });
+
+    const item = response.data;
+
+    // Format creators properly
+    let creators = [];
+    if (item.AlbumArtists && item.AlbumArtists.length > 0) {
+      creators = item.AlbumArtists.map(artist => ({ name: artist.Name, role: 'artist' }));
+    } else if (item.Artists && Array.isArray(item.Artists)) {
+      creators = item.Artists.map(name => ({ name, role: 'artist' }));
+    } else if (item.People) {
+      creators = item.People.map(p => ({ name: p.Name, role: p.Role || 'unknown' }));
+    }
+
+    const result = {
+      title: item.Name,
+      subtitle: item.AlbumArtist || (item.AlbumArtists && item.AlbumArtists.length > 0 ? item.AlbumArtists[0].Name : null),
+      year: item.ProductionYear,
+      description: item.Overview,
+      cover_url_proxy: item.ImageTags?.Primary ? `/api/lookup/jellyfin/image/${item.Id}` : null,
+      jellyfin_url: `${userSettings.jellyfin_url}/web/index.html#!/details?id=${item.Id}`,
+      creators: creators,
+      metadata: {}
+    };
+
+    // Fetch track list for audio albums
+    if (item.Type === 'MusicAlbum' && ['cd', 'vinyl'].includes(type)) {
+      try {
+        const tracksResponse = await axios.get(`${userSettings.jellyfin_url}/Items`, {
+          params: {
+            ParentId: item.Id,
+            SortBy: 'SortName',
+            SortOrder: 'Ascending',
+            Recursive: false
+          },
+          headers: {
+            'X-Emby-Token': userSettings.jellyfin_api_key
+          },
+          timeout: 5000
+        });
+        
+        if (tracksResponse.data.Items) {
+          result.metadata.track_count = tracksResponse.data.Items.length;
+          result.metadata.tracks = tracksResponse.data.Items.map(track => ({
+            number: track.IndexNumber,
+            title: track.Name,
+            duration: track.RunTimeTicks ? Math.round(track.RunTimeTicks / 10000000) : null
+          }));
+          
+          const totalSeconds = result.metadata.tracks.reduce((sum, track) => sum + (track.duration || 0), 0);
+          result.metadata.total_duration = totalSeconds;
+        }
+      } catch (trackError) {
+        console.error('Failed to fetch tracks during resync:', trackError.message);
+      }
+    }
+
+    res.json(result);
+
+  } catch (error) {
+    console.error('Jellyfin resync error:', error.response?.data || error.message);
+    res.status(500).json({ 
+      error: 'Failed to resync with Jellyfin',
+      message: error.message
+    });
   }
 });
 
@@ -629,6 +841,200 @@ router.get('/comicvine/volume/:id', async (req, res) => {
       error: 'Comic Vine lookup failed',
       message: error.response?.data?.error || error.message || 'An unexpected error occurred'
     });
+  }
+});
+
+// Search MusicBrainz for albums
+router.get('/musicbrainz/search', async (req, res) => {
+  try {
+    const { q, barcode } = req.query;
+
+    if (!q && !barcode) {
+      return res.status(400).json({ error: 'Search query or barcode required' });
+    }
+
+    // Apply rate limiting
+    await musicBrainzRateLimit();
+
+    let searchQuery;
+    if (barcode) {
+      // Search by barcode
+      searchQuery = `barcode:${barcode}`;
+    } else {
+      // Search by album name
+      searchQuery = q;
+    }
+
+    const response = await axios.get(`${MUSICBRAINZ_BASE_URL}/release`, {
+      params: {
+        query: searchQuery,
+        fmt: 'json',
+        limit: 10
+      },
+      headers: {
+        'User-Agent': MUSICBRAINZ_USER_AGENT
+      },
+      timeout: 10000
+    });
+
+    if (!response.data.releases || response.data.releases.length === 0) {
+      return res.json({ results: [] });
+    }
+
+    // Format results
+    const results = response.data.releases.map(release => {
+      const artists = release['artist-credit']?.map(ac => ac.name).join(', ') || 'Unknown Artist';
+      
+      return {
+        musicbrainz_id: release.id,
+        title: release.title,
+        subtitle: artists,
+        year: release.date ? new Date(release.date).getFullYear() : null,
+        barcode: release.barcode,
+        country: release.country,
+        format: release['release-events']?.[0]?.area?.name,
+        track_count: release['track-count'],
+        label: release['label-info']?.[0]?.label?.name,
+        cover_url_musicbrainz: `${COVERART_BASE_URL}/release/${release.id}/front-500`,
+        musicbrainz_url: `https://musicbrainz.org/release/${release.id}`,
+        metadata: {
+          status: release.status,
+          packaging: release.packaging,
+          disambiguation: release.disambiguation
+        }
+      };
+    });
+
+    res.json({ results });
+
+  } catch (error) {
+    console.error('MusicBrainz search error:', error.response?.data || error.message);
+    
+    if (error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT') {
+      return res.status(504).json({ 
+        error: 'MusicBrainz API timeout',
+        message: 'The MusicBrainz API took too long to respond. Please try again.'
+      });
+    }
+    
+    if (error.response?.status === 503) {
+      return res.status(503).json({ 
+        error: 'MusicBrainz API unavailable',
+        message: 'The MusicBrainz API is currently unavailable. Please try again later.'
+      });
+    }
+    
+    res.status(500).json({ error: 'MusicBrainz search failed' });
+  }
+});
+
+// Get detailed MusicBrainz release information
+router.get('/musicbrainz/release/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Apply rate limiting
+    await musicBrainzRateLimit();
+
+    const response = await axios.get(`${MUSICBRAINZ_BASE_URL}/release/${id}`, {
+      params: {
+        inc: 'artist-credits+labels+recordings+release-groups',
+        fmt: 'json'
+      },
+      headers: {
+        'User-Agent': MUSICBRAINZ_USER_AGENT
+      },
+      timeout: 10000
+    });
+
+    const release = response.data;
+    const artists = release['artist-credit']?.map(ac => ac.name).join(', ') || 'Unknown Artist';
+
+    // Extract track information
+    const tracks = [];
+    let trackNumber = 1;
+    
+    if (release.media && release.media.length > 0) {
+      release.media.forEach(medium => {
+        if (medium.tracks) {
+          medium.tracks.forEach(track => {
+            tracks.push({
+              number: trackNumber++,
+              title: track.title,
+              duration: track.length ? Math.round(track.length / 1000) : null, // Convert ms to seconds
+              position: track.position
+            });
+          });
+        }
+      });
+    }
+
+    const totalDuration = tracks.reduce((sum, track) => sum + (track.duration || 0), 0);
+
+    // Try to get cover art
+    let coverUrl = null;
+    try {
+      await musicBrainzRateLimit();
+      const coverResponse = await axios.head(`${COVERART_BASE_URL}/release/${id}/front`, {
+        timeout: 5000
+      });
+      if (coverResponse.status === 200) {
+        coverUrl = `${COVERART_BASE_URL}/release/${id}/front-500`;
+      }
+    } catch (coverError) {
+      // Cover art not available, that's okay
+      console.log(`No cover art available for release ${id}`);
+    }
+
+    // Extract creators (artists)
+    const creators = [];
+    if (release['artist-credit']) {
+      release['artist-credit'].forEach(ac => {
+        creators.push({
+          name: ac.artist?.name || ac.name,
+          role: 'artist'
+        });
+      });
+    }
+
+    res.json({
+      source: 'musicbrainz',
+      data: {
+        musicbrainz_id: release.id,
+        title: release.title,
+        subtitle: artists,
+        year: release.date ? new Date(release.date).getFullYear() : null,
+        description: release['release-group']?.disambiguation || '',
+        cover_url: coverUrl,
+        barcode: release.barcode,
+        publisher: release['label-info']?.[0]?.label?.name,
+        publish_date: release.date,
+        creators: creators,
+        metadata: {
+          track_count: tracks.length,
+          tracks: tracks,
+          total_duration: totalDuration,
+          country: release.country,
+          format: release.media?.[0]?.format,
+          status: release.status,
+          packaging: release.packaging,
+          asin: release.asin
+        },
+        musicbrainz_url: `https://musicbrainz.org/release/${release.id}`
+      }
+    });
+
+  } catch (error) {
+    console.error('MusicBrainz details error:', error.response?.data || error.message);
+    
+    if (error.response?.status === 404) {
+      return res.status(404).json({ 
+        error: 'Not found',
+        message: 'The requested release was not found on MusicBrainz.'
+      });
+    }
+    
+    res.status(500).json({ error: 'MusicBrainz lookup failed' });
   }
 });
 

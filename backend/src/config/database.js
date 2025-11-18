@@ -20,7 +20,8 @@ const db = new Database(DB_PATH);
 // Enable foreign keys
 db.pragma('foreign_keys = ON');
 
-// Enable WAL mode for better concurrency
-db.pragma('journal_mode = WAL');
+// Use DELETE journal mode for better compatibility with Docker bind mounts
+// WAL mode can cause issues with some filesystems and backup strategies
+db.pragma('journal_mode = DELETE');
 
 export default db;

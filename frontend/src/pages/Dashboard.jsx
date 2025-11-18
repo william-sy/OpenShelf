@@ -3,37 +3,47 @@ import { Link } from 'react-router-dom';
 import { useItemStore } from '../store/itemStore';
 import { useAuthStore } from '../store/authStore';
 import { FiBook, FiDisc, FiImage, FiPlus, FiFilm, FiFileText } from 'react-icons/fi';
+import { API_URL } from '../services/api';
+
+// Helper to convert relative API URLs to absolute URLs
+const getImageUrl = (url) => {
+  if (!url) return null;
+  if (url.startsWith('http://') || url.startsWith('https://')) return url;
+  if (url.startsWith('/api/')) return `${API_URL}${url}`;
+  if (url.startsWith('/')) return `${API_URL}${url}`;
+  return url;
+};
 
 export default function Dashboard() {
-  const { user } = useAuthStore();
-  const { items, fetchItems } = useItemStore();
+  const { user, canModifyItems } = useAuthStore();
+  const { allItems, fetchAllItems } = useItemStore();
 
   useEffect(() => {
-    fetchItems();
-  }, [fetchItems]);
+    fetchAllItems();
+  }, [fetchAllItems]);
 
   const stats = {
-    total: items.length,
-    books: items.filter((i) => i.type === 'book').length,
-    comics: items.filter((i) => i.type === 'comic').length,
-    cds: items.filter((i) => i.type === 'cd').length,
-    vinyl: items.filter((i) => i.type === 'vinyl').length,
-    dvds: items.filter((i) => i.type === 'dvd').length,
-    blurays: items.filter((i) => i.type === 'bluray').length,
-    ebooks: items.filter((i) => i.type === 'ebook').length,
+    total: allItems.length,
+    books: allItems.filter((i) => i.type === 'book').length,
+    comics: allItems.filter((i) => i.type === 'comic').length,
+    cds: allItems.filter((i) => i.type === 'cd').length,
+    vinyl: allItems.filter((i) => i.type === 'vinyl').length,
+    dvds: allItems.filter((i) => i.type === 'dvd').length,
+    blurays: allItems.filter((i) => i.type === 'bluray').length,
+    ebooks: allItems.filter((i) => i.type === 'ebook').length,
   };
 
-  const recentItems = items.slice(0, 5);
+  const recentItems = allItems.slice(0, 5);
 
   const statCards = [
-    { label: 'Total Items', value: stats.total, icon: FiImage, color: 'bg-blue-500' },
-    { label: 'Books', value: stats.books, icon: FiBook, color: 'bg-green-500' },
-    { label: 'Comics', value: stats.comics, icon: FiImage, color: 'bg-purple-500' },
-    { label: 'CDs', value: stats.cds, icon: FiDisc, color: 'bg-orange-500' },
-    { label: 'Vinyl', value: stats.vinyl, icon: FiDisc, color: 'bg-pink-500' },
-    { label: 'DVDs', value: stats.dvds, icon: FiFilm, color: 'bg-red-500' },
-    { label: 'Blu-rays', value: stats.blurays, icon: FiFilm, color: 'bg-indigo-500' },
-    { label: 'Ebooks', value: stats.ebooks, icon: FiFileText, color: 'bg-teal-500' },
+    { label: 'Total Items', value: stats.total, icon: FiImage, color: 'bg-blue-500', type: '' },
+    { label: 'Books', value: stats.books, icon: FiBook, color: 'bg-green-500', type: 'book' },
+    { label: 'Comics', value: stats.comics, icon: FiImage, color: 'bg-purple-500', type: 'comic' },
+    { label: 'CDs', value: stats.cds, icon: FiDisc, color: 'bg-orange-500', type: 'cd' },
+    { label: 'Vinyl', value: stats.vinyl, icon: FiDisc, color: 'bg-pink-500', type: 'vinyl' },
+    { label: 'DVDs', value: stats.dvds, icon: FiFilm, color: 'bg-red-500', type: 'dvd' },
+    { label: 'Blu-rays', value: stats.blurays, icon: FiFilm, color: 'bg-indigo-500', type: 'bluray' },
+    { label: 'Ebooks', value: stats.ebooks, icon: FiFileText, color: 'bg-teal-500', type: 'ebook' },
   ];
 
   return (
@@ -51,7 +61,11 @@ export default function Dashboard() {
       {/* Stats Grid */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-8 gap-4">
         {statCards.map((stat) => (
-          <div key={stat.label} className="card">
+          <Link
+            key={stat.label}
+            to={stat.type ? `/items?type=${stat.type}` : '/items'}
+            className="card hover:shadow-lg transition-shadow cursor-pointer"
+          >
             <div className="flex flex-col items-center text-center">
               <div className={`${stat.color} p-3 rounded-lg mb-3`}>
                 <stat.icon className="w-6 h-6 text-white" />
@@ -61,7 +75,7 @@ export default function Dashboard() {
               </p>
               <p className="text-sm text-gray-600 dark:text-gray-400 dark:text-gray-400 mt-1">{stat.label}</p>
             </div>
-          </div>
+          </Link>
         ))}
       </div>
 
@@ -69,16 +83,18 @@ export default function Dashboard() {
       <div className="card">
         <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 dark:text-gray-100 mb-4">Quick Actions</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Link
-            to="/items/add"
-            className="flex items-center space-x-3 p-4 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg hover:border-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-colors"
-          >
-            <FiPlus className="w-6 h-6 text-primary-600 dark:text-primary-400" />
-            <div>
-              <p className="font-medium text-gray-900 dark:text-gray-100 dark:text-gray-100">Add Item</p>
-              <p className="text-sm text-gray-600 dark:text-gray-400 dark:text-gray-400">Manually or via ISBN</p>
-            </div>
-          </Link>
+          {canModifyItems() && (
+            <Link
+              to="/items/add"
+              className="flex items-center space-x-3 p-4 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg hover:border-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-colors"
+            >
+              <FiPlus className="w-6 h-6 text-primary-600 dark:text-primary-400" />
+              <div>
+                <p className="font-medium text-gray-900 dark:text-gray-100 dark:text-gray-100">Add Item</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400 dark:text-gray-400">Manually or via ISBN</p>
+              </div>
+            </Link>
+          )}
 
           <Link
             to="/items?type=book"
@@ -122,7 +138,7 @@ export default function Dashboard() {
               >
                 {item.cover_url ? (
                   <img
-                    src={item.cover_url}
+                    src={getImageUrl(item.cover_url)}
                     alt={item.title}
                     className="w-12 h-16 object-cover rounded"
                   />
@@ -147,7 +163,7 @@ export default function Dashboard() {
       )}
 
       {/* Empty State */}
-      {items.length === 0 && (
+      {allItems.length === 0 && (
         <div className="card text-center py-12">
           <FiBook className="w-16 h-16 text-gray-400 dark:text-gray-500 mx-auto mb-4" />
           <h3 className="text-xl font-medium text-gray-900 dark:text-gray-100 dark:text-gray-100 mb-2">

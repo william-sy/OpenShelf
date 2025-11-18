@@ -2,22 +2,31 @@ import axios from 'axios';
 
 // Dynamically determine API URL based on current location
 // This allows the app to work on localhost, LAN IP, or custom domains
+// BUILD: 2025-11-17-21:30:00
 const getApiUrl = () => {
   // If VITE_API_URL is explicitly set, use it
   if (import.meta.env.VITE_API_URL) {
     return import.meta.env.VITE_API_URL;
   }
   
-  // Otherwise, use the same host as the frontend but on port 3001
+  // Otherwise, determine based on the current location
   const protocol = window.location.protocol;
   const hostname = window.location.hostname;
+  const port = window.location.port;
   
-  // If running on production domain, use same origin (nginx proxy handles routing)
-  if (hostname === 'books.stelling19.nl') {
+  // Debug logging to see what we're detecting
+  console.log('Detected location:', { protocol, hostname, port });
+  
+  // If frontend is on standard HTTP/HTTPS port (80/443) with no port specified,
+  // assume nginx is proxying and use same origin
+  if (port === '80' || port === '443' || port === '') {
+    console.log('Using same-origin API (nginx proxy expected)');
     return `${protocol}//${hostname}`;
   }
   
-  // Development: direct connection to backend port
+  // For port 3000 or any other port, connect directly to backend on port 3001
+  // This handles both development (vite on 5173) and Docker (frontend on 3000)
+  console.log('Using direct backend connection on port 3001');
   return `${protocol}//${hostname}:3001`;
 };
 
@@ -33,7 +42,22 @@ const api = axios.create({
 
 // Add auth token to requests
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
+  // Try to get token from localStorage first (backwards compatibility)
+  let token = localStorage.getItem('token');
+  
+  // If not found, try to get it from the Zustand persist store
+  if (!token) {
+    try {
+      const authStorage = localStorage.getItem('auth-storage');
+      if (authStorage) {
+        const parsed = JSON.parse(authStorage);
+        token = parsed.state?.token;
+      }
+    } catch (e) {
+      console.error('Error parsing auth-storage:', e);
+    }
+  }
+  
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -75,3 +99,4 @@ api.interceptors.response.use(
 );
 
 export default api;
+export { API_URL };

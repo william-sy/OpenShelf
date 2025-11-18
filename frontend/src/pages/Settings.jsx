@@ -31,6 +31,7 @@ export default function Settings() {
     jellyfin_api_key: '',
     comicvine_api_key: '',
   });
+  const [allowRegistration, setAllowRegistration] = useState(true);
 
   useEffect(() => {
     // Load API settings and currency on component mount (admin only)
@@ -51,9 +52,12 @@ export default function Settings() {
           jellyfin_api_key: response.data.jellyfin_api_key ? '••••••••••••••••' : '',
           comicvine_api_key: response.data.comicvine_api_key ? '••••••••••••••••' : '',
         });
-        // Load currency
-        if (response.data.currency) {
-          setCurrency(response.data.currency);
+        // Note: Currency is loaded separately by App.jsx from user preferences
+        // Don't load it here to avoid overwriting user's personal preference
+        
+        // Load registration setting
+        if (response.data.allow_registration !== undefined) {
+          setAllowRegistration(response.data.allow_registration);
         }
       } catch (error) {
         console.error('Failed to load API settings:', error);
@@ -120,6 +124,7 @@ export default function Settings() {
         jellyfin_url: apiSettings.jellyfin_url,
         jellyfin_api_key: apiSettings.jellyfin_api_key === '••••••••••••••••' ? originalApiSettings.jellyfin_api_key : apiSettings.jellyfin_api_key,
         comicvine_api_key: apiSettings.comicvine_api_key === '••••••••••••••••' ? originalApiSettings.comicvine_api_key : apiSettings.comicvine_api_key,
+        allow_registration: allowRegistration,
       };
       
       await api.put('/api/settings/apis', updatedSettings);
@@ -134,6 +139,9 @@ export default function Settings() {
         jellyfin_api_key: response.data.jellyfin_api_key ? '••••••••••••••••' : '',
         comicvine_api_key: response.data.comicvine_api_key ? '••••••••••••••••' : '',
       });
+      if (response.data.allow_registration !== undefined) {
+        setAllowRegistration(response.data.allow_registration);
+      }
     } catch (error) {
       toast.error(error.response?.data?.error || 'Failed to update API settings');
     } finally {
@@ -213,6 +221,52 @@ export default function Settings() {
       {/* Account Information */}
       <div className="card">
         <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 dark:text-gray-100 mb-4">Account Information</h2>
+        
+        {/* Profile Picture */}
+        <div className="mb-6 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+          <div className="flex items-center gap-4">
+            {user?.profile_picture ? (
+              <img
+                src={user.profile_picture}
+                alt={user.username}
+                className="w-20 h-20 rounded-full object-cover border-2 border-gray-200 dark:border-gray-600"
+              />
+            ) : (
+              <div className="w-20 h-20 rounded-full bg-primary-500 flex items-center justify-center text-white text-2xl font-bold border-2 border-gray-200 dark:border-gray-600">
+                {(user?.display_name || user?.username || 'U')[0].toUpperCase()}
+              </div>
+            )}
+            <div className="flex-1">
+              <p className="font-medium text-gray-900 dark:text-gray-100 mb-1">Profile Picture</p>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+                Upload a profile picture to personalize your account
+              </p>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+
+                  const formData = new FormData();
+                  formData.append('image', file);
+
+                  try {
+                    const response = await api.post('/api/auth/profile-picture', formData, {
+                      headers: { 'Content-Type': 'multipart/form-data' }
+                    });
+                    updateUser(response.data.user);
+                    toast.success('Profile picture updated successfully!');
+                  } catch (error) {
+                    toast.error(error.response?.data?.error || 'Failed to upload profile picture');
+                  }
+                }}
+                className="text-sm text-gray-600 dark:text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100 dark:file:bg-primary-900/30 dark:file:text-primary-400"
+              />
+            </div>
+          </div>
+        </div>
+
         <form onSubmit={handleProfileUpdate} className="space-y-4">
           <div className="flex items-center space-x-3 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
             <FiUser className="w-5 h-5 text-gray-600 dark:text-gray-400 dark:text-gray-400" />
@@ -393,6 +447,27 @@ export default function Settings() {
                 comicvine.gamespot.com/api
               </a>
             </p>
+          </div>
+
+          {/* User Registration Toggle */}
+          <div>
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={allowRegistration}
+                onChange={(e) => setAllowRegistration(e.target.checked)}
+                className="w-5 h-5 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                disabled={!isAdmin()}
+              />
+              <div>
+                <span className="font-medium text-gray-900 dark:text-gray-100">
+                  Allow New User Registration
+                </span>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  When disabled, new users cannot create accounts. Only administrators can create new users.
+                </p>
+              </div>
+            </label>
           </div>
 
           {isAdmin() && (

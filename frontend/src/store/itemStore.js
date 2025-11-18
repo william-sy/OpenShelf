@@ -2,7 +2,8 @@ import { create } from 'zustand';
 import api from '../services/api';
 
 export const useItemStore = create((set, get) => ({
-  items: [],
+  items: [], // Filtered items for current view
+  allItems: [], // Complete collection (always unfiltered)
   loading: false,
   error: null,
   filter: {
@@ -13,6 +14,18 @@ export const useItemStore = create((set, get) => ({
 
   setFilter: (filter) => {
     set({ filter: { ...get().filter, ...filter } });
+  },
+
+  // Fetch all items without filters (for dashboard stats)
+  fetchAllItems: async () => {
+    try {
+      const response = await api.get('/api/items');
+      set({ allItems: response.data });
+      return response.data;
+    } catch (error) {
+      console.error('Failed to fetch all items:', error);
+      return [];
+    }
   },
 
   fetchItems: async () => {
@@ -26,6 +39,11 @@ export const useItemStore = create((set, get) => ({
 
       const response = await api.get(`/api/items?${params.toString()}`);
       set({ items: response.data, loading: false });
+      
+      // Also update allItems if no filters are applied
+      if (!type && !search && wishlist === null) {
+        set({ allItems: response.data });
+      }
     } catch (error) {
       set({ error: error.message, loading: false });
     }

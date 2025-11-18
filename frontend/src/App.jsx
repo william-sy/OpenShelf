@@ -31,15 +31,24 @@ function App() {
   const initTheme = useThemeStore((state) => state.initTheme);
   const loadCurrency = useCurrencyStore((state) => state.loadCurrency);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const token = useAuthStore((state) => state.token);
 
   useEffect(() => {
     initTheme();
   }, [initTheme]);
   
   // Load currency when authentication state changes or on mount
+  // Wait for token to be available if authenticated to avoid race condition
   useEffect(() => {
-    loadCurrency();
-  }, [isAuthenticated, loadCurrency]);
+    if (isAuthenticated && !token) {
+      // Token not yet available, wait a bit
+      const timeout = setTimeout(() => loadCurrency(), 100);
+      return () => clearTimeout(timeout);
+    } else {
+      // Either not authenticated (will use public endpoint) or token is ready
+      loadCurrency();
+    }
+  }, [isAuthenticated, token, loadCurrency]);
 
   return (
     <BrowserRouter>

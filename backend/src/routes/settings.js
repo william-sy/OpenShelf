@@ -20,6 +20,17 @@ router.get('/currency', async (req, res) => {
   }
 });
 
+// Public endpoint to check if registration is allowed (no auth required)
+router.get('/registration-status', async (req, res) => {
+  try {
+    const allowed = ApiSettings.isRegistrationAllowed();
+    res.json({ allowed });
+  } catch (error) {
+    console.error('Error checking registration status:', error);
+    res.json({ allowed: true }); // Default to true on error
+  }
+});
+
 // All other routes require authentication
 router.use(authenticateToken);
 
@@ -45,7 +56,8 @@ router.get('/apis', async (req, res) => {
       jellyfin_url: settings.jellyfin_url || '',
       jellyfin_api_key: settings.jellyfin_api_key || '',
       comicvine_api_key: settings.comicvine_api_key || '',
-      currency: settings.currency || 'USD'
+      currency: settings.currency || 'USD',
+      allow_registration: settings?.allow_registration !== undefined ? Boolean(settings.allow_registration) : true
     });
   } catch (error) {
     console.error('Error fetching API settings:', error);
@@ -56,7 +68,7 @@ router.get('/apis', async (req, res) => {
 // Update API settings (admin only)
 router.put('/apis', requireAdmin, async (req, res) => {
   try {
-    const { tmdb_api_key, jellyfin_url, jellyfin_api_key, comicvine_api_key, currency } = req.body;
+    const { tmdb_api_key, jellyfin_url, jellyfin_api_key, comicvine_api_key, currency, allow_registration } = req.body;
     
     // Store settings under the admin's user ID (system-wide settings)
     const settings = ApiSettings.upsert(req.user.id, {
@@ -64,7 +76,8 @@ router.put('/apis', requireAdmin, async (req, res) => {
       jellyfin_url,
       jellyfin_api_key,
       comicvine_api_key,
-      currency
+      currency,
+      allow_registration
     });
     
     res.json({
@@ -74,7 +87,8 @@ router.put('/apis', requireAdmin, async (req, res) => {
         jellyfin_url: settings.jellyfin_url || '',
         jellyfin_api_key: settings.jellyfin_api_key || '',
         comicvine_api_key: settings.comicvine_api_key || '',
-        currency: settings.currency || 'USD'
+        currency: settings.currency || 'USD',
+        allow_registration: settings?.allow_registration !== undefined ? Boolean(settings.allow_registration) : true
       }
     });
   } catch (error) {

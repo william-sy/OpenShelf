@@ -34,6 +34,10 @@ export const ApiSettings = {
         updates.push('currency = ?');
         values.push(settingsData.currency || 'USD');
       }
+      if (settingsData.allow_registration !== undefined) {
+        updates.push('allow_registration = ?');
+        values.push(settingsData.allow_registration ? 1 : 0);
+      }
       
       if (updates.length === 0) return existing;
       
@@ -51,8 +55,8 @@ export const ApiSettings = {
     } else {
       // Insert new settings
       const stmt = db.prepare(`
-        INSERT INTO api_settings (user_id, tmdb_api_key, jellyfin_url, jellyfin_api_key, comicvine_api_key, currency)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO api_settings (user_id, tmdb_api_key, jellyfin_url, jellyfin_api_key, comicvine_api_key, currency, allow_registration)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
       `);
       
       stmt.run(
@@ -61,11 +65,20 @@ export const ApiSettings = {
         settingsData.jellyfin_url || null,
         settingsData.jellyfin_api_key || null,
         settingsData.comicvine_api_key || null,
-        settingsData.currency || 'USD'
+        settingsData.currency || 'USD',
+        settingsData.allow_registration !== undefined ? (settingsData.allow_registration ? 1 : 0) : 1
       );
       
       return this.findByUserId(userId);
     }
+  },
+
+  // Get system-wide registration setting
+  isRegistrationAllowed() {
+    // Check settings from first admin user (system-wide settings)
+    const settings = db.prepare('SELECT allow_registration FROM api_settings WHERE user_id = 1').get();
+    // Default to true if not set
+    return settings ? Boolean(settings.allow_registration) : true;
   },
 
   delete(userId) {

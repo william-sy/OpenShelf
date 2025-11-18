@@ -5,14 +5,24 @@ import { useAuthStore } from '../store/authStore';
 import { useCurrencyStore } from '../store/currencyStore';
 import useReadingStatusStore from '../store/readingStatusStore';
 import toast from 'react-hot-toast';
-import { FiEdit2, FiTrash2, FiArrowLeft, FiCalendar, FiBook, FiMapPin, FiStar, FiHeart, FiBookOpen, FiCheckCircle, FiClock, FiLock, FiCopy } from 'react-icons/fi';
+import { FiEdit2, FiTrash2, FiArrowLeft, FiCalendar, FiBook, FiMapPin, FiStar, FiHeart, FiBookOpen, FiCheckCircle, FiClock, FiLock, FiCopy, FiRefreshCw } from 'react-icons/fi';
+import api, { API_URL } from '../services/api';
+
+// Helper to convert relative API URLs to absolute URLs
+const getImageUrl = (url) => {
+  if (!url) return null;
+  if (url.startsWith('http://') || url.startsWith('https://')) return url;
+  if (url.startsWith('/api/')) return `${API_URL}${url}`;
+  if (url.startsWith('/')) return `${API_URL}${url}`;
+  return url;
+};
 
 export default function ItemDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const getItemById = useItemStore((state) => state.getItemById);
   const { formatPrice } = useCurrencyStore();
-  const { isAdmin } = useAuthStore();
+  const { isAdmin, canModifyItems } = useAuthStore();
   const { deleteItem, updateItem, fetchItems } = useItemStore();
   const { fetchReadingStatus, updateReadingStatus, deleteReadingStatus, getReadingStatus } = useReadingStatusStore();
   const [item, setItem] = useState(null);
@@ -99,6 +109,70 @@ export default function ItemDetail() {
     }
   };
 
+  const handleRatingChange = async (rating) => {
+    try {
+      const updatedItem = { ...item, rating };
+      await updateItem(parseInt(id), updatedItem);
+      setItem(updatedItem);
+      toast.success(rating === 0 ? 'Rating removed' : `Rated ${rating} stars`);
+    } catch (error) {
+      toast.error('Failed to update rating');
+    }
+  };
+
+  const handleFavoriteToggle = async () => {
+    try {
+      const updatedItem = { ...item, favorite: !item.favorite };
+      await updateItem(parseInt(id), updatedItem);
+      setItem(updatedItem);
+      toast.success(updatedItem.favorite ? 'Added to favorites' : 'Removed from favorites');
+    } catch (error) {
+      toast.error('Failed to update favorite');
+    }
+  };
+
+  const handleJellyfinResync = async () => {
+    if (!item.jellyfin_id) return;
+    
+    try {
+      toast.loading('Resyncing with Jellyfin...', { id: 'resync' });
+      
+      // Fetch fresh metadata from Jellyfin
+      const response = await api.get(`/api/lookup/jellyfin/resync/${item.jellyfin_id}`, {
+        params: { type: item.type }
+      });
+      
+      const freshData = response.data;
+      
+      // Prepare updated item data
+      const updatedItemData = {
+        title: freshData.title,
+        subtitle: freshData.subtitle,
+        description: freshData.description,
+        creators: freshData.creators,
+        metadata: freshData.metadata,
+        jellyfin_url: freshData.jellyfin_url,
+      };
+      
+      // Download new cover image if available
+      if (freshData.cover_url_proxy) {
+        updatedItemData.cover_url = freshData.cover_url_proxy;
+      }
+      
+      // Update the item
+      await updateItem(parseInt(id), updatedItemData);
+      
+      // Refresh the page to show updated data
+      const refreshedItem = await getItemById(parseInt(id));
+      setItem(refreshedItem);
+      
+      toast.success('Successfully resynced with Jellyfin!', { id: 'resync' });
+    } catch (error) {
+      console.error('Resync error:', error);
+      toast.error(error.response?.data?.message || 'Failed to resync with Jellyfin', { id: 'resync' });
+    }
+  };
+
   if (!item) {
     return (
       <div className="text-center py-12">
@@ -121,7 +195,7 @@ export default function ItemDetail() {
           <div className="md:w-1/3">
             {item.cover_url ? (
               <img
-                src={item.cover_url}
+                src={getImageUrl(item.cover_url)}
                 alt={item.title}
                 className="w-full rounded-lg shadow-lg"
               />
@@ -153,23 +227,64 @@ export default function ItemDetail() {
               {item.creators && item.creators.length > 0 && (
                 <div className="mt-3 space-y-1">
                   {item.creators.map((creator, idx) => (
-                    <p key={idx} className="text-sm text-gray-700 dark:text-gray-300">
-                      <span className="font-medium capitalize">{creator.role}:</span> {creator.name}
-                    </p>
+                    creator.name && (
+                      <p key={idx} className="text-sm text-gray-700 dark:text-gray-300">
+                        {creator.role && <span className="font-medium capitalize">{creator.role}: </span>}
+                        {creator.name}
+                      </p>
+                    )
                   ))}
                 </div>
               )}
             </div>
 
-            {/* Rating */}
-            {item.rating && (
+            {/* Rating and Favorite */}
+            <div className="flex items-center gap-6">
+              {/* Star Rating */}
               <div className="flex items-center gap-2">
-                <FiStar className="text-yellow-500 fill-current" />
-                <span className="text-lg text-gray-900 dark:text-gray-100">
-                  {item.rating}/5
-                </span>
+                <span className="text-sm text-gray-600 dark:text-gray-400">Rating:</span>
+                <div className="flex items-center gap-1">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button
+                      key={star}
+                      onClick={() => handleRatingChange(star)}
+                      className="focus:outline-none transition-colors"
+                      disabled={!canModifyItems()}
+                    >
+                      <FiStar
+                        className={`w-5 h-5 ${
+                          star <= (item.rating || 0)
+                            ? 'text-yellow-500 fill-current'
+                            : 'text-gray-300 dark:text-gray-600'
+                        } ${canModifyItems() ? 'hover:text-yellow-400 cursor-pointer' : 'cursor-default'}`}
+                      />
+                    </button>
+                  ))}
+                  {item.rating > 0 && canModifyItems() && (
+                    <button
+                      onClick={() => handleRatingChange(0)}
+                      className="ml-2 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
               </div>
-            )}
+
+              {/* Favorite Toggle */}
+              <button
+                onClick={handleFavoriteToggle}
+                className={`flex items-center gap-2 px-3 py-1 rounded-full transition-colors ${
+                  item.favorite
+                    ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400'
+                    : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'
+                }`}
+                disabled={!canModifyItems()}
+              >
+                <FiHeart className={`w-4 h-4 ${item.favorite ? 'fill-current' : ''}`} />
+                <span className="text-sm">{item.favorite ? 'Favorited' : 'Favorite'}</span>
+              </button>
+            </div>
 
             {/* Quick Info */}
             <div className="grid grid-cols-2 gap-4 py-4 border-y border-gray-200 dark:border-gray-700">
@@ -239,10 +354,11 @@ export default function ItemDetail() {
               )}
             </div>
 
-            {/* Reading Status */}
-            <div className="py-4 border-t border-gray-200 dark:border-gray-700">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400">Reading Status</h3>
+            {/* Reading Status - Only for books, comics, and ebooks */}
+            {['book', 'comic', 'ebook'].includes(item?.type) && (
+              <div className="py-4 border-t border-gray-200 dark:border-gray-700">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400">Reading Status</h3>
                 {readingStatus && (
                   <button
                     onClick={handleRemoveReadingStatus}
@@ -365,7 +481,42 @@ export default function ItemDetail() {
                   </button>
                 </div>
               )}
-            </div>
+              </div>
+            )}
+
+            {/* Track Listing - Only for CDs and Vinyl with track data */}
+            {['cd', 'vinyl'].includes(item?.type) && item.metadata?.tracks && item.metadata.tracks.length > 0 && (
+              <div className="py-4 border-t border-gray-200 dark:border-gray-700">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                    Track Listing ({item.metadata.track_count} tracks
+                    {item.metadata.total_duration && ` • ${Math.floor(item.metadata.total_duration / 60)}:${String(item.metadata.total_duration % 60).padStart(2, '0')}`})
+                  </h3>
+                </div>
+                <div className="space-y-1">
+                  {item.metadata.tracks.map((track, index) => (
+                    <div
+                      key={index}
+                      className="flex items-center justify-between py-2 px-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded text-sm"
+                    >
+                      <div className="flex items-center gap-3 flex-1">
+                        <span className="text-gray-500 dark:text-gray-400 w-8 text-right">
+                          {track.number || index + 1}.
+                        </span>
+                        <span className="text-gray-900 dark:text-gray-100">
+                          {track.title}
+                        </span>
+                      </div>
+                      {track.duration && (
+                        <span className="text-gray-500 dark:text-gray-400 text-xs">
+                          {Math.floor(track.duration / 60)}:{String(track.duration % 60).padStart(2, '0')}
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Tags */}
             {item.tags && item.tags.length > 0 && (
@@ -385,38 +536,49 @@ export default function ItemDetail() {
             )}
 
             {/* Actions */}
-            <div className="flex gap-3 pt-4">
-              <button
-                onClick={handleWishlistToggle}
-                className={`btn ${item.wishlist ? 'btn-secondary' : 'btn-primary'} flex items-center gap-2`}
-              >
-                <FiHeart className={`inline ${item.wishlist ? 'fill-current' : ''}`} />
-                {item.wishlist ? 'Remove from Wishlist' : 'Add to Wishlist'}
-              </button>
-              {isAdmin() ? (
-                <>
+            <div className="pt-4">
+              {canModifyItems() ? (
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  <button
+                    onClick={handleWishlistToggle}
+                    className={`btn ${item.wishlist ? 'btn-secondary' : 'btn-primary'} flex items-center justify-center gap-2`}
+                  >
+                    <FiHeart className={`inline ${item.wishlist ? 'fill-current' : ''}`} />
+                    <span className="hidden sm:inline">{item.wishlist ? 'Remove from' : 'Add to'} Wishlist</span>
+                    <span className="sm:hidden">Wishlist</span>
+                  </button>
+                  {item.jellyfin_id && (
+                    <button
+                      onClick={handleJellyfinResync}
+                      className="btn btn-secondary flex items-center justify-center gap-2"
+                      title="Update metadata from Jellyfin"
+                    >
+                      <FiRefreshCw className="inline" />
+                      <span className="hidden sm:inline">Resync</span>
+                    </button>
+                  )}
                   <button
                     onClick={handleDuplicate}
-                    className="btn btn-secondary flex items-center gap-2"
+                    className="btn btn-secondary flex items-center justify-center gap-2"
                     title="Create a copy of this item (useful for multiple editions)"
                   >
                     <FiCopy className="inline" />
-                    Duplicate
+                    <span className="hidden sm:inline">Duplicate</span>
                   </button>
-                  <Link to={`/items/${id}/edit`} className="btn btn-primary flex items-center gap-2">
+                  <Link to={`/items/${id}/edit`} className="btn btn-primary flex items-center justify-center gap-2">
                     <FiEdit2 className="inline" />
-                    Edit
+                    <span className="hidden sm:inline">Edit</span>
                   </Link>
                   <button
                     onClick={() => setShowDeleteConfirm(true)}
-                    className="btn btn-danger flex items-center gap-2"
+                    className="btn btn-danger flex items-center justify-center gap-2"
                   >
                     <FiTrash2 className="inline" />
-                    Delete
+                    <span className="hidden sm:inline">Delete</span>
                   </button>
-                </>
+                </div>
               ) : (
-                <div className="flex-1 flex items-center gap-2 text-gray-500 dark:text-gray-400 text-sm px-4">
+                <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400 text-sm px-4 py-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
                   <FiLock />
                   <span>Read-only access - Contact an admin to edit this item</span>
                 </div>

@@ -3,7 +3,7 @@ import {
   BarChart, Bar, PieChart, Pie, LineChart, Line, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
 } from 'recharts';
-import { FiTrendingUp, FiDollarSign, FiPackage, FiHeart, FiAward } from 'react-icons/fi';
+import { FiTrendingUp, FiDollarSign, FiPackage, FiHeart, FiAward, FiStar } from 'react-icons/fi';
 import { useCurrencyStore } from '../store/currencyStore';
 import api from '../services/api';
 
@@ -74,7 +74,7 @@ export default function Statistics() {
       </div>
 
       {/* Key Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <div className="card">
           <div className="flex items-center justify-between">
             <div>
@@ -85,6 +85,37 @@ export default function Statistics() {
             </div>
             <div className="w-12 h-12 bg-primary-100 dark:bg-primary-900/30 rounded-lg flex items-center justify-center">
               <FiPackage className="w-6 h-6 text-primary-600 dark:text-primary-400" />
+            </div>
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-600 dark:text-gray-400">Favorites</p>
+              <p className="text-3xl font-bold text-gray-900 dark:text-gray-100 mt-1">
+                {stats.favoriteCount}
+              </p>
+            </div>
+            <div className="w-12 h-12 bg-yellow-100 dark:bg-yellow-900/30 rounded-lg flex items-center justify-center">
+              <FiStar className="w-6 h-6 text-yellow-600 dark:text-yellow-400" />
+            </div>
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-600 dark:text-gray-400">Average Rating</p>
+              <p className="text-3xl font-bold text-gray-900 dark:text-gray-100 mt-1">
+                {stats.averageRating > 0 ? `${stats.averageRating} ★` : 'N/A'}
+              </p>
+              <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+                {stats.ratedItemsCount} rated items
+              </p>
+            </div>
+            <div className="w-12 h-12 bg-yellow-100 dark:bg-yellow-900/30 rounded-lg flex items-center justify-center">
+              <FiStar className="w-6 h-6 text-yellow-600 dark:text-yellow-400 fill-current" />
             </div>
           </div>
         </div>

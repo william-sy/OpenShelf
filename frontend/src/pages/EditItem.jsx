@@ -263,23 +263,34 @@ export default function EditItem() {
           <div>
             <label className="label">Cover Image</label>
             <div className="space-y-2">
-              <input
-                type="url"
-                name="cover_url"
-                value={formData.cover_url || ''}
-                onChange={handleChange}
-                placeholder="Or enter image URL"
-                className="input"
-              />
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-600 dark:text-gray-400">or</span>
+              {formData.cover_url && (formData.cover_url.startsWith('/api/') || formData.cover_url.startsWith('/uploads/jellyfin_')) ? (
                 <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageUpload}
-                  className="text-sm text-gray-600 dark:text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100"
+                  type="text"
+                  value={formData.cover_url.startsWith('/uploads/jellyfin_') ? "Using Jellyfin cover image" : "Using image from API"}
+                  readOnly
+                  className="input bg-gray-100 dark:bg-gray-700"
                 />
-              </div>
+              ) : (
+                <>
+                  <input
+                    type="url"
+                    name="cover_url"
+                    value={formData.cover_url || ''}
+                    onChange={handleChange}
+                    placeholder="Or enter image URL"
+                    className="input"
+                  />
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-gray-600 dark:text-gray-400">or</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageUpload}
+                      className="text-sm text-gray-600 dark:text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100"
+                    />
+                  </div>
+                </>
+              )}
               {uploadingImage && (
                 <p className="text-sm text-gray-600 dark:text-gray-400">Uploading image...</p>
               )}
@@ -288,16 +299,19 @@ export default function EditItem() {
 
           <div>
 
-            <div>
-              <label className="label">Page Count</label>
-              <input
-                type="number"
-                name="page_count"
-                value={formData.page_count}
-                onChange={handleChange}
-                className="input"
-              />
-            </div>
+            {/* Page Count - Only for books, comics, and ebooks */}
+            {['book', 'comic', 'ebook'].includes(formData.type) && (
+              <div>
+                <label className="label">Page Count</label>
+                <input
+                  type="number"
+                  name="page_count"
+                  value={formData.page_count}
+                  onChange={handleChange}
+                  className="input"
+                />
+              </div>
+            )}
           </div>
         </div>
 

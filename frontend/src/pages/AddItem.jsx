@@ -5,7 +5,16 @@ import { useCurrencyStore } from '../store/currencyStore';
 import toast from 'react-hot-toast';
 import { FiSearch, FiCamera, FiX } from 'react-icons/fi';
 import ISBNScanner from '../components/ISBNScanner';
-import api from '../services/api';
+import api, { API_URL } from '../services/api';
+
+// Helper to convert relative API URLs to absolute URLs
+const getImageUrl = (url) => {
+  if (!url) return null;
+  if (url.startsWith('http://') || url.startsWith('https://')) return url;
+  if (url.startsWith('/api/')) return `${API_URL}${url}`;
+  if (url.startsWith('/')) return `${API_URL}${url}`;
+  return url;
+};
 
 export default function AddItem() {
   const navigate = useNavigate();
@@ -59,9 +68,11 @@ export default function AddItem() {
   const [tmdbResults, setTmdbResults] = useState([]);
   const [jellyfinResults, setJellyfinResults] = useState([]);
   const [comicVineResults, setComicVineResults] = useState([]);
+  const [musicBrainzResults, setMusicBrainzResults] = useState([]);
   const [showTmdbResults, setShowTmdbResults] = useState(false);
   const [showJellyfinResults, setShowJellyfinResults] = useState(false);
   const [showComicVineResults, setShowComicVineResults] = useState(false);
+  const [showMusicBrainzResults, setShowMusicBrainzResults] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [comicVineFilter, setComicVineFilter] = useState('all'); // 'all', 'issues', 'volumes'
   const [comicVineSortBy, setComicVineSortBy] = useState('relevance'); // 'relevance', 'year', 'title'
@@ -144,19 +155,25 @@ export default function AddItem() {
     }
   };
 
-  const handleScan = async (isbn) => {
-    setFormData({ ...formData, isbn });
+  const handleScan = async (barcode) => {
+    setFormData({ ...formData, isbn: barcode });
     setShowScanner(false);
+    
+    // Only try ISBN lookup for books, comics, and ebooks
+    if (!['book', 'comic', 'ebook'].includes(formData.type)) {
+      toast.success('Barcode scanned successfully');
+      return;
+    }
     
     // Only try lookup once
     setLookingUp(true);
     try {
-      const result = await lookupISBN(isbn);
+      const result = await lookupISBN(barcode);
       const creators = (result.data.authors || []).map(name => ({ name, role: 'author' }));
       setFormData({
         ...formData,
         ...result.data,
-        isbn,
+        isbn: barcode,
         creators,
         authors: result.data.authors || [],
       });
@@ -167,7 +184,7 @@ export default function AddItem() {
       // Just set the ISBN and let user fill in details manually
       setFormData({
         ...formData,
-        isbn,
+        isbn: barcode,
       });
       toast.error('ISBN lookup failed - please enter details manually', { duration: 4000 });
     } finally {
@@ -262,16 +279,26 @@ export default function AddItem() {
       itemType = 'cd'; // Default to CD for audio content
     }
     
+    // Prepare metadata with track info if available
+    const metadata = {};
+    if (result.track_count) {
+      metadata.track_count = result.track_count;
+      metadata.tracks = result.tracks;
+      metadata.total_duration = result.total_duration;
+    }
+    
     setFormData({
       ...formData,
       type: itemType,
       title: result.title || formData.title,
       subtitle: result.subtitle || formData.subtitle,
       description: result.description || formData.description,
-      cover_url: result.cover_url || formData.cover_url,
+      // Use cover_url_proxy (triggers download on save) instead of cover_url (direct Jellyfin URL)
+      cover_url: result.cover_url_proxy || formData.cover_url,
       jellyfin_id: result.jellyfin_id,
       jellyfin_url: result.jellyfin_url,
       creators: result.creators || formData.creators,
+      metadata: metadata, // Store as object, backend will stringify
     });
     setShowJellyfinResults(false);
     setSearchQuery('');
@@ -368,6 +395,76 @@ export default function AddItem() {
     } catch (error) {
       console.error('Comic Vine details failed:', error);
       toast.error(error.response?.data?.message || 'Failed to load comic details');
+    } finally {
+      setLookingUp(false);
+    }
+  };
+
+  const handleMusicBrainzSearch = async () => {
+    if (!searchQuery.trim() && !formData.barcode) {
+      toast.error('Please enter a search query or barcode');
+      return;
+    }
+
+    setLookingUp(true);
+    try {
+      const response = await api.get('/api/lookup/musicbrainz/search', {
+        params: {
+          q: searchQuery || undefined,
+          barcode: formData.barcode || undefined
+        }
+      });
+      setMusicBrainzResults(response.data.results || []);
+      setShowMusicBrainzResults(true);
+    } catch (error) {
+      console.error('MusicBrainz search failed:', error);
+      toast.error(error.response?.data?.message || 'MusicBrainz search failed. Please try again.');
+    } finally {
+      setLookingUp(false);
+    }
+  };
+
+  const handleMusicBrainzSelect = async (result) => {
+    setLookingUp(true);
+    try {
+      const response = await api.get(`/api/lookup/musicbrainz/release/${result.musicbrainz_id}`);
+      const data = response.data.data;
+      
+      // Prepare metadata with track info
+      const metadata = {};
+      if (data.metadata?.track_count) {
+        metadata.track_count = data.metadata.track_count;
+        metadata.tracks = data.metadata.tracks;
+        metadata.total_duration = data.metadata.total_duration;
+        metadata.format = data.metadata.format;
+        metadata.country = data.metadata.country;
+      }
+      
+      setFormData({
+        ...formData,
+        title: data.title,
+        subtitle: data.subtitle || '',
+        description: data.description || '',
+        cover_url: data.cover_url || '',
+        publish_date: data.publish_date || '',
+        publisher: data.publisher || '',
+        creators: data.creators || [],
+        barcode: data.barcode || formData.barcode,
+        metadata: metadata, // Store as object, backend will stringify
+        tags: [
+          ...(formData.tags || []),
+          ...(data.metadata?.country ? [`Country: ${data.metadata.country}`] : []),
+          ...(data.metadata?.format ? [`Format: ${data.metadata.format}`] : [])
+        ]
+      });
+      setShowMusicBrainzResults(false);
+      setSearchQuery('');
+      
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      toast.success(`Loaded from MusicBrainz: ${data.title}. Review the details and click "Add Item" to save.`, { duration: 5000 });
+    } catch (error) {
+      console.error('MusicBrainz details failed:', error);
+      toast.error(error.response?.data?.message || 'Failed to load release details');
     } finally {
       setLookingUp(false);
     }
@@ -495,21 +592,27 @@ export default function AddItem() {
             )}
             
             <div>
-              <label className="label">ISBN Lookup {formData.type === 'comic' && '(works for graphic novels with ISBN)'}</label>
+              <label className="label">
+                {['book', 'comic', 'ebook'].includes(formData.type) 
+                  ? `ISBN Lookup ${formData.type === 'comic' ? '(works for graphic novels with ISBN)' : ''}`
+                  : 'Barcode / UPC'}
+              </label>
               <div className="flex gap-2">
                 <input
                   type="text"
                   name="isbn"
                   value={formData.isbn}
                   onChange={handleChange}
-                  placeholder="Enter ISBN (10 or 13 digits)"
+                  placeholder={['book', 'comic', 'ebook'].includes(formData.type) 
+                    ? "Enter ISBN (10 or 13 digits)"
+                    : "Enter barcode or UPC"}
                   className="input flex-1"
                 />
                 <button
                   type="button"
                   onClick={() => setShowScanner(true)}
                   className="btn btn-secondary"
-                  title="Scan barcode"
+                  title={['book', 'comic', 'ebook'].includes(formData.type) ? "Scan ISBN" : "Scan barcode"}
                 >
                   <FiCamera className="w-5 h-5" />
                 </button>
@@ -579,6 +682,32 @@ export default function AddItem() {
                   <FiCamera className="w-5 h-5" />
                 </button>
               </div>
+            </div>
+
+            <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+              <label className="label">Search MusicBrainz</label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), handleMusicBrainzSearch())}
+                  placeholder="Search for album or artist..."
+                  className="input flex-1"
+                />
+                <button
+                  type="button"
+                  onClick={handleMusicBrainzSearch}
+                  disabled={lookingUp || (!searchQuery.trim() && !formData.barcode)}
+                  className="btn btn-primary disabled:opacity-50"
+                >
+                  <FiSearch className="inline mr-2" />
+                  {lookingUp ? 'Searching...' : 'Search'}
+                </button>
+              </div>
+              <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                Search MusicBrainz database by album name or use the barcode above
+              </p>
             </div>
           </div>
         )}
@@ -780,31 +909,58 @@ export default function AddItem() {
           <div>
             <label className="label">Cover Image</label>
             <div className="space-y-2">
-              <input
-                type="url"
-                name="cover_url"
-                value={formData.cover_url}
-                onChange={handleChange}
-                placeholder="Or enter image URL"
-                className="input"
-              />
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-600 dark:text-gray-400">or</span>
+              {formData.cover_url && formData.cover_url.startsWith('/api/') ? (
+                <div>
+                  <input
+                    type="text"
+                    value={
+                      formData.cover_url.includes('jellyfin') ? 'Using Jellyfin cover image' :
+                      formData.cover_url.includes('tmdb') ? 'Using TMDB cover image' :
+                      'Using auto-fetched cover image'
+                    }
+                    readOnly
+                    className="input bg-gray-50 dark:bg-gray-700 text-gray-600 dark:text-gray-400 cursor-not-allowed"
+                  />
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    Cover image auto-fetched • <button 
+                      type="button"
+                      onClick={() => setFormData({ ...formData, cover_url: '' })}
+                      className="text-primary-600 dark:text-primary-400 hover:underline"
+                    >
+                      Clear to use custom URL
+                    </button>
+                  </p>
+                </div>
+              ) : (
                 <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageUpload}
-                  className="text-sm text-gray-600 dark:text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100"
+                  type="url"
+                  name="cover_url"
+                  value={formData.cover_url}
+                  onChange={handleChange}
+                  placeholder="Enter image URL (https://...)"
+                  className="input"
                 />
-              </div>
+              )}
+              {/* Only show file upload if not using Jellyfin/API image */}
+              {(!formData.cover_url || !formData.cover_url.startsWith('/api/')) && (
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-600 dark:text-gray-400">or</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    className="text-sm text-gray-600 dark:text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100"
+                  />
+                </div>
+              )}
               {uploadingImage && (
                 <p className="text-sm text-gray-600 dark:text-gray-400">Uploading image...</p>
               )}
             </div>
           </div>
 
-          <div>
-
+          {/* Page Count - Only for books, comics, and ebooks */}
+          {['book', 'comic', 'ebook'].includes(formData.type) && (
             <div>
               <label className="label">Page Count</label>
               <input
@@ -815,7 +971,7 @@ export default function AddItem() {
                 className="input"
               />
             </div>
-          </div>
+          )}
         </div>
 
         {/* Additional Details */}
@@ -1095,7 +1251,7 @@ export default function AddItem() {
                   >
                     {result.cover_url && (
                       <img
-                        src={result.cover_url}
+                        src={getImageUrl(result.cover_url)}
                         alt={result.title}
                         className="w-16 h-24 object-cover rounded"
                       />
@@ -1147,7 +1303,7 @@ export default function AddItem() {
                   >
                     {result.cover_url && (
                       <img
-                        src={result.cover_url}
+                        src={getImageUrl(result.cover_url)}
                         alt={result.title}
                         className="w-16 h-24 object-cover rounded"
                       />
@@ -1164,6 +1320,66 @@ export default function AddItem() {
                         <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-2 mt-1">
                           {result.description}
                         </p>
+                      )}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* MusicBrainz Search Results Modal */}
+      {showMusicBrainzResults && (
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100">MusicBrainz Results</h3>
+              <button
+                onClick={() => setShowMusicBrainzResults(false)}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+              >
+                <FiX className="w-6 h-6" />
+              </button>
+            </div>
+
+            {musicBrainzResults.length === 0 ? (
+              <p className="text-gray-600 dark:text-gray-400 text-center py-8">
+                No results found on MusicBrainz. Try a different search term or barcode.
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {musicBrainzResults.map((result) => (
+                  <button
+                    key={result.musicbrainz_id}
+                    onClick={() => handleMusicBrainzSelect(result)}
+                    className="w-full flex gap-4 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors text-left"
+                  >
+                    {result.cover_url_musicbrainz && (
+                      <img
+                        src={result.cover_url_musicbrainz}
+                        alt={result.title}
+                        className="w-16 h-24 object-cover rounded"
+                        onError={(e) => e.target.style.display = 'none'}
+                      />
+                    )}
+                    <div className="flex-1">
+                      <h4 className="font-semibold text-gray-900 dark:text-gray-100">{result.title}</h4>
+                      {result.subtitle && (
+                        <p className="text-sm text-gray-600 dark:text-gray-400">{result.subtitle}</p>
+                      )}
+                      <div className="flex gap-3 text-xs text-gray-500 dark:text-gray-500 mt-1">
+                        {result.year && <span>{result.year}</span>}
+                        {result.country && <span>{result.country}</span>}
+                        {result.format && <span>{result.format}</span>}
+                        {result.track_count && <span>{result.track_count} tracks</span>}
+                      </div>
+                      {result.label && (
+                        <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">Label: {result.label}</p>
+                      )}
+                      {result.barcode && (
+                        <p className="text-xs text-gray-500 dark:text-gray-500">Barcode: {result.barcode}</p>
                       )}
                     </div>
                   </button>
@@ -1237,7 +1453,7 @@ export default function AddItem() {
                     >
                       {result.cover_url && (
                         <img
-                          src={result.cover_url}
+                          src={getImageUrl(result.cover_url)}
                           alt={result.title}
                           className="w-16 h-24 object-cover rounded flex-shrink-0"
                         />

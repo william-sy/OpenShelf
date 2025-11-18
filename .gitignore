@@ -4,3 +4,5 @@
 .env.production
 build-and-push.sh
 docker-compose-prod.yml
+frontend/dist/
+node_modules/

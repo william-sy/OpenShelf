@@ -49,6 +49,7 @@ export function initializeDatabase() {
       file_path TEXT, -- Path to ebook file for digital books
       comicvine_id TEXT, -- Comic Vine ID for comics
       wishlist BOOLEAN DEFAULT 0, -- Mark items as wishlist items
+      favorite BOOLEAN DEFAULT 0, -- Mark items as favorites
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
@@ -278,6 +279,23 @@ export function initializeDatabase() {
     console.log('✅ currency column added');
   }
 
+  // Add allow_registration column to api_settings table if needed
+  const hasAllowRegistration = apiSettingsTableInfo.some(col => col.name === 'allow_registration');
+  if (apiSettingsTableInfo.length > 0 && !hasAllowRegistration) {
+    console.log('🔄 Adding allow_registration column to api_settings table...');
+    db.exec(`ALTER TABLE api_settings ADD COLUMN allow_registration BOOLEAN DEFAULT 1`);
+    console.log('✅ allow_registration column added');
+  }
+
+  // Add profile_picture column to users table if needed
+  const usersTableInfoForProfile = db.prepare("PRAGMA table_info(users)").all();
+  const hasProfilePicture = usersTableInfoForProfile.some(col => col.name === 'profile_picture');
+  if (usersTableInfoForProfile.length > 0 && !hasProfilePicture) {
+    console.log('🔄 Adding profile_picture column to users table...');
+    db.exec(`ALTER TABLE users ADD COLUMN profile_picture TEXT`);
+    console.log('✅ profile_picture column added');
+  }
+
   // Migrate existing 'user' roles to 'reader' for RBAC
   // Check if we need to update the users table to support 'reader' role
   const userRoleInfo = db.prepare("PRAGMA table_info(users)").all();
@@ -349,6 +367,18 @@ export function initializeDatabase() {
     console.log('✅ Currency column added to users table');
   }
 
+  // Set all existing users to admin role (one-time migration)
+  console.log('🔄 Checking if existing users need admin role migration...');
+  const nonAdminUsers = db.prepare("SELECT COUNT(*) as count FROM users WHERE role != 'admin'").get();
+  
+  if (nonAdminUsers && nonAdminUsers.count > 0) {
+    console.log(`🔄 Setting ${nonAdminUsers.count} existing users to admin role...`);
+    const result = db.prepare("UPDATE users SET role = 'admin', updated_at = CURRENT_TIMESTAMP WHERE role != 'admin'").run();
+    console.log(`✅ ${result.changes} users updated to admin role`);
+  } else {
+    console.log('✅ All existing users already have admin role');
+  }
+
   // Migrate to shared library model
   // Consolidate all items under a single admin/user (shared library)
   console.log('🔄 Checking for shared library migration...');
@@ -399,6 +429,20 @@ export function initializeDatabase() {
     
     console.log('✅ Default admin user created (username: admin, password: admin)');
     console.log('⚠️  Please change the default password!');
+  }
+
+  // Run favorite column migration for existing databases
+  try {
+    const tableInfo = db.prepare("PRAGMA table_info(items)").all();
+    const hasFavoriteColumn = tableInfo.some(col => col.name === 'favorite');
+    
+    if (!hasFavoriteColumn) {
+      console.log('🔄 Adding favorite column...');
+      db.exec(`ALTER TABLE items ADD COLUMN favorite BOOLEAN DEFAULT 0`);
+      console.log('✅ Favorite column added');
+    }
+  } catch (error) {
+    console.warn('⚠️ Could not add favorite column:', error.message);
   }
 
   console.log('✅ Database initialized successfully');
