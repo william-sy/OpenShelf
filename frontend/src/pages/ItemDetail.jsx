@@ -5,8 +5,9 @@ import { useAuthStore } from '../store/authStore';
 import { useCurrencyStore } from '../store/currencyStore';
 import useReadingStatusStore from '../store/readingStatusStore';
 import toast from 'react-hot-toast';
-import { FiEdit2, FiTrash2, FiArrowLeft, FiCalendar, FiBook, FiMapPin, FiStar, FiHeart, FiBookOpen, FiCheckCircle, FiClock, FiLock, FiCopy, FiRefreshCw } from 'react-icons/fi';
+import { FiEdit2, FiTrash2, FiArrowLeft, FiCalendar, FiBook, FiMapPin, FiStar, FiHeart, FiBookOpen, FiCheckCircle, FiClock, FiLock, FiCopy, FiRefreshCw, FiFile, FiDownload, FiPrinter } from 'react-icons/fi';
 import api, { API_URL } from '../services/api';
+import ItemLabel from '../components/ItemLabel';
 
 // Helper to convert relative API URLs to absolute URLs
 const getImageUrl = (url) => {
@@ -29,6 +30,8 @@ export default function ItemDetail() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [readingStatus, setReadingStatus] = useState(null);
   const [showStatusPicker, setShowStatusPicker] = useState(false);
+  const [showPrintPreview, setShowPrintPreview] = useState(false);
+  const [labelSettings, setLabelSettings] = useState(null);
 
   useEffect(() => {
     fetchItems().then(() => {
@@ -170,6 +173,29 @@ export default function ItemDetail() {
     } catch (error) {
       console.error('Resync error:', error);
       toast.error(error.response?.data?.message || 'Failed to resync with Jellyfin', { id: 'resync' });
+    }
+  };
+
+  const handlePrintLabel = async () => {
+    try {
+      // Load label settings from API
+      const response = await api.get('/api/settings/labels');
+      const settings = response.data;
+      
+      // Check if base URL is configured
+      if (!settings.baseUrl) {
+        toast.error('Please configure label settings first (Profile → Label Settings)');
+        navigate('/label-settings');
+        return;
+      }
+
+      setLabelSettings(settings);
+      setShowPrintPreview(true);
+      
+      // Don't auto-open print dialog - let user see preview first
+    } catch (error) {
+      console.error('Error loading label settings:', error);
+      toast.error('Failed to load label settings');
     }
   };
 
@@ -319,6 +345,15 @@ export default function ItemDetail() {
                 <div>
                   <p className="text-sm text-gray-600 dark:text-gray-400">Pages</p>
                   <p className="font-medium text-gray-900 dark:text-gray-100">{item.page_count}</p>
+                </div>
+              )}
+              {item.file_path && item.type === 'ebook' && (
+                <div>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">File</p>
+                  <p className="font-medium flex items-center gap-1 text-gray-900 dark:text-gray-100">
+                    <FiFile className="w-4 h-4" />
+                    {item.file_path.split('/').pop().split('_').slice(3).join('_') || 'Ebook file attached'}
+                  </p>
                 </div>
               )}
               {item.condition && (
@@ -547,6 +582,27 @@ export default function ItemDetail() {
                     <span className="hidden sm:inline">{item.wishlist ? 'Remove from' : 'Add to'} Wishlist</span>
                     <span className="sm:hidden">Wishlist</span>
                   </button>
+                  {item.file_path && item.type === 'ebook' && (
+                    <>
+                      <Link
+                        to={`/items/${id}/read`}
+                        className="btn btn-primary flex items-center justify-center gap-2"
+                        title="Read this ebook"
+                      >
+                        <FiBookOpen className="inline" />
+                        <span className="hidden sm:inline">Read</span>
+                      </Link>
+                      <a
+                        href={`${API_URL}${item.file_path}`}
+                        download
+                        className="btn btn-secondary flex items-center justify-center gap-2"
+                        title="Download ebook file"
+                      >
+                        <FiDownload className="inline" />
+                        <span className="hidden sm:inline">Download</span>
+                      </a>
+                    </>
+                  )}
                   {item.jellyfin_id && (
                     <button
                       onClick={handleJellyfinResync}
@@ -557,6 +613,14 @@ export default function ItemDetail() {
                       <span className="hidden sm:inline">Resync</span>
                     </button>
                   )}
+                  <button
+                    onClick={handlePrintLabel}
+                    className="btn btn-secondary flex items-center justify-center gap-2"
+                    title="Print QR code label for this item"
+                  >
+                    <FiPrinter className="inline" />
+                    <span className="hidden sm:inline">Print Label</span>
+                  </button>
                   <button
                     onClick={handleDuplicate}
                     className="btn btn-secondary flex items-center justify-center gap-2"
@@ -629,6 +693,110 @@ export default function ItemDetail() {
           </div>
         </div>
       )}
+
+      {/* Print Preview Modal - Shows on screen before printing */}
+      {showPrintPreview && labelSettings && (
+        <>
+          {/* On-screen preview modal */}
+          <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 z-50 no-print">
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-4xl max-h-[90vh] overflow-auto">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100">
+                  Label Preview
+                </h3>
+                <button
+                  onClick={() => setShowPrintPreview(false)}
+                  className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                >
+                  ✕
+                </button>
+              </div>
+              
+              <div className="border-2 border-gray-300 dark:border-gray-600 rounded-lg overflow-auto bg-gray-50 dark:bg-gray-700 p-4 mb-4 flex items-center justify-center">
+                <div style={{ transform: 'scale(0.8)', transformOrigin: 'center' }}>
+                  <ItemLabel item={item} settings={labelSettings} />
+                </div>
+              </div>
+              
+              <div className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                <p>• Label size: {labelSettings.labelWidth} × {labelSettings.labelHeight} mm</p>
+                <p>• Preview scaled to fit screen - actual print will be full size</p>
+                <p>• Make sure to enable "Print backgrounds" in your browser's print dialog</p>
+              </div>
+              
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    window.print();
+                    setTimeout(() => setShowPrintPreview(false), 500);
+                  }}
+                  className="btn btn-primary flex-1"
+                >
+                  Print Label
+                </button>
+                <button
+                  onClick={() => setShowPrintPreview(false)}
+                  className="btn btn-secondary flex-1"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Hidden element for printing */}
+          <div id="print-label" className="print-only" style={{ display: 'none' }}>
+            <ItemLabel item={item} settings={labelSettings} />
+          </div>
+        </>
+      )}
+
+      {/* CSS for print mode */}
+      <style>{`
+        /* Show only the print label when printing */
+        @media print {
+          /* Hide everything */
+          body * {
+            visibility: hidden;
+          }
+          
+          /* Hide the modal */
+          .no-print {
+            display: none !important;
+          }
+          
+          /* Show only the label */
+          .print-only {
+            display: block !important;
+          }
+          
+          #print-label,
+          #print-label * {
+            visibility: visible;
+          }
+          
+          /* Position the label */
+          #print-label {
+            position: absolute;
+            left: 0;
+            top: 0;
+            margin: 0;
+            padding: 0;
+          }
+          
+          /* Configure page size */
+          @page {
+            margin: 0;
+            padding: 0;
+            size: ${labelSettings?.labelWidth || 210}mm ${labelSettings?.labelHeight || 297}mm;
+          }
+          
+          body {
+            margin: 0 !important;
+            padding: 0 !important;
+          }
+        }
+      `}</style>
     </div>
   );
 }

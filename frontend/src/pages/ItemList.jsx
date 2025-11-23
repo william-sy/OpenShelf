@@ -27,10 +27,15 @@ export default function ItemList() {
   // Apply filter from URL params on mount
   useEffect(() => {
     const typeParam = searchParams.get('type');
+    // If there's a type param and it's different from current filter, update it
     if (typeParam && typeParam !== filter.type) {
       setFilter({ type: typeParam });
     }
-  }, [searchParams, setFilter]); // Only run when URL changes
+    // If there's NO type param and we currently have a type filter, clear it
+    else if (!typeParam && filter.type) {
+      setFilter({ type: '' });
+    }
+  }, [searchParams, setFilter, filter.type]); // Only run when URL changes
 
   useEffect(() => {
     fetchItems();
@@ -305,18 +310,20 @@ export default function ItemList() {
               <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-1 mb-2">
                 {item.creators?.map(c => c.name).join(', ') || item.authors?.join(', ') || 'Unknown'}
               </p>
-              <div className="flex items-center gap-2 mb-2">
-                {item.rating > 0 && (
-                  <div className="flex items-center gap-1">
-                    {[...Array(item.rating)].map((_, i) => (
-                      <FiStar key={i} className="w-3 h-3 text-yellow-500 fill-current" />
-                    ))}
-                  </div>
-                )}
-                {item.favorite && (
-                  <FiHeart className="w-3 h-3 text-red-500 fill-current" title="Favorite" />
-                )}
-              </div>
+              {(item.rating > 0 || Boolean(item.favorite)) && (
+                <div className="flex items-center gap-2 mb-2">
+                  {item.rating > 0 && (
+                    <div className="flex items-center gap-1">
+                      {[...Array(item.rating)].map((_, i) => (
+                        <FiStar key={i} className="w-3 h-3 text-yellow-500 fill-current" />
+                      ))}
+                    </div>
+                  )}
+                  {item.favorite ? (
+                    <FiHeart className="w-3 h-3 text-red-500 fill-current" title="Favorite" />
+                  ) : null}
+                </div>
+              )}
               <div className="flex flex-wrap gap-1">
                 <span className="inline-block px-2 py-1 bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400 text-xs rounded">
                   {item.type}

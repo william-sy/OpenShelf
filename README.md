@@ -15,9 +15,11 @@ A modern, self-hosted library management system for your physical media collecti
 - 🎬 **TMDB Integration** - Automatic movie and TV show metadata lookup for video media
 - 🎵 **Jellyfin Integration** - Connect to your Jellyfin media server to link and play media directly
 - ❤️ **Wishlist** - Track items you want to acquire with dedicated wishlist management
-- � **Reading Status Tracking** - Track your reading progress with "Want to Read", "Currently Reading", and "Read" statuses
+- 📖 **Reading Status Tracking** - Track your reading progress with "Want to Read", "Currently Reading", and "Read" statuses
 - 📅 **Reading Dates** - Record start and end dates for books to track reading history
 - 📊 **Reading Statistics** - Detailed analytics including books per month, pages per week, reading velocity, and completion trends
+- 🏷️ **QR Code Label Printing** - Print customizable labels with QR codes for physical items, perfect for thermal label printers
+- 📚 **Built-in Ebook Reader** - Read EPUB, PDF, and comic books directly in your browser with full-screen support
 - �📊 **Statistics & Insights** - Visual analytics with charts showing collection trends, top creators, and more
 - 💾 **Import/Export** - Backup and restore your collection data including reading status in CSV or JSON format
 - 🔍 **Advanced Search & Filters** - Multi-parameter filtering including tags, ratings, dates, and more

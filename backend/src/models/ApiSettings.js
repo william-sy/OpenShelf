@@ -38,6 +38,62 @@ export const ApiSettings = {
         updates.push('allow_registration = ?');
         values.push(settingsData.allow_registration ? 1 : 0);
       }
+      if (settingsData.label_base_url !== undefined) {
+        updates.push('label_base_url = ?');
+        values.push(settingsData.label_base_url || null);
+      }
+      if (settingsData.label_width !== undefined) {
+        updates.push('label_width = ?');
+        values.push(settingsData.label_width || 210);
+      }
+      if (settingsData.label_height !== undefined) {
+        updates.push('label_height = ?');
+        values.push(settingsData.label_height || 297);
+      }
+      if (settingsData.label_show_title !== undefined) {
+        updates.push('label_show_title = ?');
+        values.push(settingsData.label_show_title ? 1 : 0);
+      }
+      if (settingsData.label_show_type !== undefined) {
+        updates.push('label_show_type = ?');
+        values.push(settingsData.label_show_type ? 1 : 0);
+      }
+      if (settingsData.label_show_creators !== undefined) {
+        updates.push('label_show_creators = ?');
+        values.push(settingsData.label_show_creators ? 1 : 0);
+      }
+      if (settingsData.label_show_cover !== undefined) {
+        updates.push('label_show_cover = ?');
+        values.push(settingsData.label_show_cover ? 1 : 0);
+      }
+      if (settingsData.label_qr_size !== undefined) {
+        updates.push('label_qr_size = ?');
+        values.push(settingsData.label_qr_size || 180);
+      }
+      if (settingsData.label_cover_size !== undefined) {
+        updates.push('label_cover_size = ?');
+        values.push(settingsData.label_cover_size || 60);
+      }
+      if (settingsData.label_show_isbn !== undefined) {
+        updates.push('label_show_isbn = ?');
+        values.push(settingsData.label_show_isbn ? 1 : 0);
+      }
+      if (settingsData.label_show_publisher !== undefined) {
+        updates.push('label_show_publisher = ?');
+        values.push(settingsData.label_show_publisher ? 1 : 0);
+      }
+      if (settingsData.label_show_year !== undefined) {
+        updates.push('label_show_year = ?');
+        values.push(settingsData.label_show_year ? 1 : 0);
+      }
+      if (settingsData.label_show_location !== undefined) {
+        updates.push('label_show_location = ?');
+        values.push(settingsData.label_show_location ? 1 : 0);
+      }
+      if (settingsData.label_show_url !== undefined) {
+        updates.push('label_show_url = ?');
+        values.push(settingsData.label_show_url ? 1 : 0);
+      }
       
       if (updates.length === 0) return existing;
       

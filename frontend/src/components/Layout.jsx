@@ -12,7 +12,8 @@ import {
   FiMenu,
   FiX,
   FiUser,
-  FiChevronDown
+  FiChevronDown,
+  FiPrinter
 } from 'react-icons/fi';
 import { useState, useEffect, useRef } from 'react';
 
@@ -135,6 +136,15 @@ export default function Layout() {
                       Settings
                     </Link>
 
+                    <Link
+                      to="/label-settings"
+                      onClick={() => setProfileDropdownOpen(false)}
+                      className="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                    >
+                      <FiPrinter className="w-4 h-4" />
+                      Label Settings
+                    </Link>
+
                     {isAdmin() && (
                       <Link
                         to="/user-management"
@@ -236,6 +246,20 @@ export default function Layout() {
               >
                 <FiSettings className="w-5 h-5" />
                 <span>Settings</span>
+              </Link>
+
+              {/* Label Settings */}
+              <Link
+                to="/label-settings"
+                onClick={() => setMobileMenuOpen(false)}
+                className={`flex items-center space-x-2 px-4 py-3 rounded-lg transition-colors ${
+                  isActive('/label-settings')
+                    ? 'bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400'
+                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                }`}
+              >
+                <FiPrinter className="w-5 h-5" />
+                <span>Label Settings</span>
               </Link>
 
               {/* User Management (Admin only) */}

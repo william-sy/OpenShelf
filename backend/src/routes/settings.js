@@ -97,4 +97,86 @@ router.put('/apis', requireAdmin, async (req, res) => {
   }
 });
 
+// Get label settings (authenticated users)
+router.get('/labels', authenticateToken, (req, res) => {
+  try {
+    // Get system-wide label settings from admin user (user_id = 1)
+    const settings = ApiSettings.findByUserId(1);
+    
+    const labelSettings = {
+      baseUrl: settings?.label_base_url || '',
+      labelWidth: settings?.label_width || 210,
+      labelHeight: settings?.label_height || 297,
+      qrSize: settings?.label_qr_size || 180,
+      coverSize: settings?.label_cover_size || 60,
+      showTitle: settings?.label_show_title !== undefined ? Boolean(settings.label_show_title) : true,
+      showType: settings?.label_show_type !== undefined ? Boolean(settings.label_show_type) : true,
+      showCreators: settings?.label_show_creators !== undefined ? Boolean(settings.label_show_creators) : true,
+      showCover: settings?.label_show_cover !== undefined ? Boolean(settings.label_show_cover) : true,
+      showIsbn: settings?.label_show_isbn !== undefined ? Boolean(settings.label_show_isbn) : false,
+      showPublisher: settings?.label_show_publisher !== undefined ? Boolean(settings.label_show_publisher) : false,
+      showYear: settings?.label_show_year !== undefined ? Boolean(settings.label_show_year) : false,
+      showLocation: settings?.label_show_location !== undefined ? Boolean(settings.label_show_location) : false,
+      showUrl: settings?.label_show_url !== undefined ? Boolean(settings.label_show_url) : true,
+    };
+    
+    res.json(labelSettings);
+  } catch (error) {
+    console.error('Error fetching label settings:', error);
+    res.status(500).json({ error: 'Failed to fetch label settings' });
+  }
+});
+
+// Update label settings (admin only)
+router.put('/labels', authenticateToken, requireAdmin, (req, res) => {
+  try {
+    const { 
+      baseUrl, labelWidth, labelHeight, qrSize, coverSize,
+      showTitle, showType, showCreators, showCover,
+      showIsbn, showPublisher, showYear, showLocation, showUrl
+    } = req.body;
+    
+    // Store settings under the admin's user ID (system-wide settings)
+    const settings = ApiSettings.upsert(req.user.id, {
+      label_base_url: baseUrl,
+      label_width: labelWidth,
+      label_height: labelHeight,
+      label_qr_size: qrSize,
+      label_cover_size: coverSize,
+      label_show_title: showTitle,
+      label_show_type: showType,
+      label_show_creators: showCreators,
+      label_show_cover: showCover,
+      label_show_isbn: showIsbn,
+      label_show_publisher: showPublisher,
+      label_show_year: showYear,
+      label_show_location: showLocation,
+      label_show_url: showUrl,
+    });
+    
+    res.json({
+      message: 'Label settings updated successfully',
+      settings: {
+        baseUrl: settings.label_base_url || '',
+        labelWidth: settings.label_width || 210,
+        labelHeight: settings.label_height || 297,
+        qrSize: settings.label_qr_size || 180,
+        coverSize: settings.label_cover_size || 60,
+        showTitle: Boolean(settings.label_show_title),
+        showType: Boolean(settings.label_show_type),
+        showCreators: Boolean(settings.label_show_creators),
+        showCover: Boolean(settings.label_show_cover),
+        showIsbn: Boolean(settings.label_show_isbn),
+        showPublisher: Boolean(settings.label_show_publisher),
+        showYear: Boolean(settings.label_show_year),
+        showLocation: Boolean(settings.label_show_location),
+        showUrl: Boolean(settings.label_show_url),
+      }
+    });
+  } catch (error) {
+    console.error('Error updating label settings:', error);
+    res.status(500).json({ error: 'Failed to update label settings' });
+  }
+});
+
 export default router;

@@ -1,0 +1,24 @@
+services:
+  backend:
+    container_name: openshelf-be
+    image: williamsy/openshelf-be:2.0.0
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - JWT_SECRET=${JWT_SECRET:-change-this-secret-key-in-production}
+      - DATABASE_PATH=/app/data/openshelf.db
+    volumes:
+      - /data:/app/data
+      - /uploads:/app/uploads
+    restart: unless-stopped
+
+  frontend:
+    container_name: openshelf-fe
+    image: williamsy/openshelf-fe:2.0.0
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    restart: unless-stopped

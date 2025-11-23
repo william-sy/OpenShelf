@@ -76,6 +76,9 @@ export default function AddItem() {
   const [uploadingImage, setUploadingImage] = useState(false);
   const [comicVineFilter, setComicVineFilter] = useState('all'); // 'all', 'issues', 'volumes'
   const [comicVineSortBy, setComicVineSortBy] = useState('relevance'); // 'relevance', 'year', 'title'
+  const [uploadingFile, setUploadingFile] = useState(false);
+  const [uploadedFileName, setUploadedFileName] = useState('');
+  const [extractedMetadata, setExtractedMetadata] = useState(null);
 
   const creatorRoles = [
     { value: 'author', label: 'Author' },
@@ -470,6 +473,70 @@ export default function AddItem() {
     }
   };
 
+  const handleFileUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    const allowedExtensions = ['.epub', '.pdf', '.mobi', '.cbz', '.cbr'];
+    const fileExtension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
+    if (!allowedExtensions.includes(fileExtension)) {
+      toast.error('Invalid file type. Please upload .epub, .pdf, .mobi, .cbz, or .cbr files.');
+      return;
+    }
+
+    setUploadingFile(true);
+    setUploadedFileName('');
+    setExtractedMetadata(null);
+
+    try {
+      const formDataUpload = new FormData();
+      formDataUpload.append('file', file);
+
+      const response = await api.post('/api/files/upload', formDataUpload, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+
+      const { file_path, metadata, cover_url } = response.data;
+      
+      setUploadedFileName(file.name);
+      setExtractedMetadata(metadata);
+      
+      // Auto-fill form fields from extracted metadata
+      const updates = {
+        file_path: file_path
+      };
+      
+      if (metadata?.title && !formData.title) {
+        updates.title = metadata.title;
+      }
+      if (metadata?.author && formData.creators.length === 0) {
+        updates.creators = [{ name: metadata.author, role: 'author' }];
+        updates.authors = [metadata.author]; // Legacy
+      }
+      if (metadata?.pageCount && !formData.page_count) {
+        updates.page_count = metadata.pageCount;
+      }
+      
+      // Set extracted cover image if available and no cover is set
+      if (cover_url && !formData.cover_url) {
+        updates.cover_url = cover_url;
+      }
+      
+      setFormData({
+        ...formData,
+        ...updates
+      });
+
+      toast.success(`File uploaded successfully! ${metadata?.title ? `Found: ${metadata.title}` : ''}${cover_url ? ' Cover extracted!' : ''}`);
+    } catch (error) {
+      console.error('File upload failed:', error);
+      toast.error(error.response?.data?.message || 'Failed to upload file');
+    } finally {
+      setUploadingFile(false);
+    }
+  };
+
   const addCreator = () => {
     if (creatorInput.name.trim()) {
       setFormData({
@@ -712,6 +779,73 @@ export default function AddItem() {
           </div>
         )}
 
+        {/* Ebook File Upload */}
+        {formData.type === 'ebook' && (
+          <div className="card space-y-4">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Upload Ebook File</h3>
+            
+            <div>
+              <label className="label">Select File</label>
+              <input
+                type="file"
+                accept=".epub,.pdf,.mobi,.cbz,.cbr"
+                onChange={handleFileUpload}
+                disabled={uploadingFile}
+                className="block w-full text-sm text-gray-900 dark:text-gray-100 
+                  border border-gray-300 dark:border-gray-600 rounded-lg cursor-pointer 
+                  bg-gray-50 dark:bg-gray-700 focus:outline-none
+                  file:mr-4 file:py-2 file:px-4
+                  file:rounded-l-lg file:border-0
+                  file:text-sm file:font-semibold
+                  file:bg-blue-50 file:text-blue-700
+                  dark:file:bg-blue-900 dark:file:text-blue-300
+                  hover:file:bg-blue-100 dark:hover:file:bg-blue-800
+                  disabled:opacity-50 disabled:cursor-not-allowed"
+              />
+              <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                Supported formats: EPUB, PDF, MOBI, CBZ, CBR
+              </p>
+            </div>
+
+            {uploadingFile && (
+              <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400">
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-current"></div>
+                <span>Uploading and extracting metadata...</span>
+              </div>
+            )}
+
+            {uploadedFileName && (
+              <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
+                <div className="flex items-start gap-2">
+                  <svg className="w-5 h-5 text-green-600 dark:text-green-400 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                  </svg>
+                  <div className="flex-1">
+                    <p className="font-semibold text-green-800 dark:text-green-300">File uploaded successfully!</p>
+                    <p className="text-sm text-green-700 dark:text-green-400 mt-1">
+                      <span className="font-medium">Filename:</span> {uploadedFileName}
+                    </p>
+                    {extractedMetadata && (
+                      <div className="mt-2 space-y-1 text-sm text-green-700 dark:text-green-400">
+                        {extractedMetadata.title && (
+                          <p><span className="font-medium">Detected Title:</span> {extractedMetadata.title}</p>
+                        )}
+                        {extractedMetadata.author && (
+                          <p><span className="font-medium">Detected Author:</span> {extractedMetadata.author}</p>
+                        )}
+                        {extractedMetadata.pageCount && (
+                          <p><span className="font-medium">Page Count:</span> {extractedMetadata.pageCount}</p>
+                        )}
+                        <p className="text-xs mt-2 italic">Metadata has been auto-filled in the form below. Review and edit as needed.</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Video Lookup (for DVDs and Blu-rays) */}
         {(formData.type === 'dvd' || formData.type === 'bluray') && (
           <div className="card space-y-4">
@@ -916,6 +1050,7 @@ export default function AddItem() {
                     value={
                       formData.cover_url.includes('jellyfin') ? 'Using Jellyfin cover image' :
                       formData.cover_url.includes('tmdb') ? 'Using TMDB cover image' :
+                      formData.cover_url.includes('covers') ? 'Using extracted cover from ebook' :
                       'Using auto-fetched cover image'
                     }
                     readOnly
@@ -943,13 +1078,25 @@ export default function AddItem() {
               )}
               {/* Only show file upload if not using Jellyfin/API image */}
               {(!formData.cover_url || !formData.cover_url.startsWith('/api/')) && (
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-gray-600 dark:text-gray-400">or</span>
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-sm text-gray-600 dark:text-gray-400">or upload image:</span>
+                  </div>
                   <input
                     type="file"
                     accept="image/*"
                     onChange={handleImageUpload}
-                    className="text-sm text-gray-600 dark:text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100"
+                    disabled={uploadingImage}
+                    className="block w-full text-sm text-gray-900 dark:text-gray-100 
+                      border border-gray-300 dark:border-gray-600 rounded-lg cursor-pointer 
+                      bg-gray-50 dark:bg-gray-700 focus:outline-none
+                      file:mr-4 file:py-2 file:px-4
+                      file:rounded-l-lg file:border-0
+                      file:text-sm file:font-semibold
+                      file:bg-blue-50 file:text-blue-700
+                      dark:file:bg-blue-900 dark:file:text-blue-300
+                      hover:file:bg-blue-100 dark:hover:file:bg-blue-800
+                      disabled:opacity-50 disabled:cursor-not-allowed"
                   />
                 </div>
               )}

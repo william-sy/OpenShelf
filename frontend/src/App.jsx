@@ -13,11 +13,13 @@ import ItemList from './pages/ItemList';
 import AddItem from './pages/AddItem';
 import EditItem from './pages/EditItem';
 import ItemDetail from './pages/ItemDetail';
+import Reader from './pages/Reader';
 import Wishlist from './pages/Wishlist';
 import Statistics from './pages/Statistics';
 import ReadingStats from './pages/ReadingStats';
 import UserManagement from './pages/UserManagement';
 import Settings from './pages/Settings';
+import LabelSettings from './pages/LabelSettings';
 
 // Components
 import Layout from './components/Layout';
@@ -70,11 +72,13 @@ function App() {
           <Route path="items/add" element={<AddItem />} />
           <Route path="items/:id" element={<ItemDetail />} />
           <Route path="items/:id/edit" element={<EditItem />} />
+          <Route path="items/:id/read" element={<Reader />} />
           <Route path="wishlist" element={<Wishlist />} />
           <Route path="statistics" element={<Statistics />} />
           <Route path="reading-stats" element={<ReadingStats />} />
           <Route path="user-management" element={<UserManagement />} />
           <Route path="settings" element={<Settings />} />
+          <Route path="label-settings" element={<LabelSettings />} />
         </Route>
       </Routes>
     </BrowserRouter>
