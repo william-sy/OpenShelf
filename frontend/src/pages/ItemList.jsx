@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useItemStore } from '../store/itemStore';
 import { useAuthStore } from '../store/authStore';
@@ -23,19 +23,18 @@ export default function ItemList() {
   const [showImportModal, setShowImportModal] = useState(false);
   const [importFile, setImportFile] = useState(null);
   const [importing, setImporting] = useState(false);
+  const lastUrlType = useRef(null); // Start as null so first check always runs
 
-  // Apply filter from URL params on mount
+  // Sync filter from URL params when URL changes
   useEffect(() => {
-    const typeParam = searchParams.get('type');
-    // If there's a type param and it's different from current filter, update it
-    if (typeParam && typeParam !== filter.type) {
+    const typeParam = searchParams.get('type') || '';
+    // Only update if URL actually changed (not if filter changed internally)
+    if (lastUrlType.current === null || typeParam !== lastUrlType.current) {
+      console.log('URL type changed from', lastUrlType.current, 'to', typeParam);
+      lastUrlType.current = typeParam;
       setFilter({ type: typeParam });
     }
-    // If there's NO type param and we currently have a type filter, clear it
-    else if (!typeParam && filter.type) {
-      setFilter({ type: '' });
-    }
-  }, [searchParams, setFilter, filter.type]); // Only run when URL changes
+  }, [searchParams, setFilter]);
 
   useEffect(() => {
     fetchItems();
@@ -56,15 +55,27 @@ export default function ItemList() {
   };
 
   const handleTypeFilter = (type) => {
-    setFilter({ type: type === filter.type ? '' : type });
+    console.log('handleTypeFilter called with:', type);
+    console.log('Current filter.type:', filter.type);
+    const newType = type === filter.type ? '' : type;
+    console.log('Setting type to:', newType);
+    setFilter({ type: newType });
   };
 
   const handleWishlistFilter = (value) => {
-    setFilter({ wishlist: filter.wishlist === value ? null : value });
+    console.log('handleWishlistFilter called with:', value);
+    console.log('Current filter.wishlist:', filter.wishlist);
+    const newWishlist = filter.wishlist === value ? null : value;
+    console.log('Setting wishlist to:', newWishlist);
+    setFilter({ wishlist: newWishlist });
   };
 
   const handleFavoriteFilter = (value) => {
-    setFilter({ favorite: filter.favorite === value ? null : value });
+    console.log('handleFavoriteFilter called with:', value);
+    console.log('Current filter.favorite:', filter.favorite);
+    const newFavorite = filter.favorite === value ? null : value;
+    console.log('Setting favorite to:', newFavorite);
+    setFilter({ favorite: newFavorite });
   };
 
   const handleExport = async (format) => {
