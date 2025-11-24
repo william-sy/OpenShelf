@@ -22,7 +22,7 @@ import { useState, useEffect, useRef } from 'react';
 
 export default function Layout() {
   const { user, logout, isAdmin } = useAuthStore();
-  const { theme, toggleTheme } = useThemeStore();
+  const { isDark, toggleTheme } = useThemeStore();
   const location = useLocation();
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -97,9 +97,9 @@ export default function Layout() {
               <button
                 onClick={toggleTheme}
                 className="p-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-                title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+                title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
               >
-                {theme === 'dark' ? (
+                {isDark ? (
                   <FiSun className="w-5 h-5" />
                 ) : (
                   <FiMoon className="w-5 h-5" />

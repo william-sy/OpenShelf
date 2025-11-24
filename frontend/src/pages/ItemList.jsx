@@ -46,6 +46,18 @@ export default function ItemList() {
     fetchItems();
   }, [filter, fetchItems]);
 
+  // Close modal on Escape key
+  useEffect(() => {
+    const handleEscape = (e) => {
+      if (e.key === 'Escape' && showMultiPrintModal) {
+        setShowMultiPrintModal(false);
+      }
+    };
+
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [showMultiPrintModal]);
+
   const handleSearch = (e) => {
     e.preventDefault();
     setFilter({ search: searchInput });
@@ -407,7 +419,7 @@ export default function ItemList() {
                   ) : null}
                 </div>
               )}
-              <div className="flex flex-wrap gap-1">
+              <div className="flex flex-wrap gap-1 pb-12">
                 <span className="inline-block px-2 py-1 bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400 text-xs rounded">
                   {item.type}
                 </span>

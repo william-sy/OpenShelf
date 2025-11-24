@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useItemStore } from '../store/itemStore';
 import { useAuthStore } from '../store/authStore';
@@ -698,7 +699,7 @@ export default function ItemDetail() {
       {showPrintPreview && labelSettings && (
         <>
           {/* On-screen preview modal */}
-          <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 z-50 no-print">
+          <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 z-50">
             <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-4xl max-h-[90vh] overflow-auto">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100">
@@ -744,10 +745,13 @@ export default function ItemDetail() {
             </div>
           </div>
 
-          {/* Hidden element for printing */}
-          <div id="print-label" className="print-only" style={{ display: 'none' }}>
-            <ItemLabel item={item} settings={labelSettings} />
-          </div>
+          {/* Print content using Portal - renders directly to body */}
+          {createPortal(
+            <div id="print-label">
+              <ItemLabel item={item} settings={labelSettings} />
+            </div>,
+            document.body
+          )}
         </>
       )}
 
@@ -755,28 +759,14 @@ export default function ItemDetail() {
       <style>{`
         /* Show only the print label when printing */
         @media print {
-          /* Hide everything */
-          body * {
-            visibility: hidden;
-          }
-          
-          /* Hide the modal */
-          .no-print {
+          /* Hide all body children except our print content */
+          body > *:not(#print-label) {
             display: none !important;
           }
           
-          /* Show only the label */
-          .print-only {
-            display: block !important;
-          }
-          
-          #print-label,
-          #print-label * {
-            visibility: visible;
-          }
-          
-          /* Position the label */
+          /* Show and position the label */
           #print-label {
+            display: block !important;
             position: absolute;
             left: 0;
             top: 0;
@@ -784,7 +774,7 @@ export default function ItemDetail() {
             padding: 0;
           }
           
-          /* Configure page size */
+          /* Configure page */
           @page {
             margin: 0;
             padding: 0;
@@ -794,6 +784,11 @@ export default function ItemDetail() {
             margin: 0 !important;
             padding: 0 !important;
           }
+        }
+        
+        /* Hide print content on screen */
+        #print-label {
+          display: none;
         }
       `}</style>
     </div>

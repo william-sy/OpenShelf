@@ -104,7 +104,10 @@ export default function ItemLabel({ item, settings }) {
               objectFit: 'contain',
             }}
             crossOrigin="anonymous"
-            onError={(e) => { e.target.style.display = 'none'; }}
+            onError={(e) => { 
+              console.error('Failed to load cover image:', coverImageUrl, 'for item:', item.title);
+              e.target.style.display = 'none'; 
+            }}
           />
         </div>
       )}
