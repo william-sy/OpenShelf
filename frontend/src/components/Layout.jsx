@@ -1,5 +1,6 @@
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
+import { useThemeStore } from '../store/themeStore';
 import { 
   FiHome, 
   FiBook, 
@@ -13,12 +14,15 @@ import {
   FiX,
   FiUser,
   FiChevronDown,
-  FiPrinter
+  FiPrinter,
+  FiSun,
+  FiMoon
 } from 'react-icons/fi';
 import { useState, useEffect, useRef } from 'react';
 
 export default function Layout() {
   const { user, logout, isAdmin } = useAuthStore();
+  const { theme, toggleTheme } = useThemeStore();
   const location = useLocation();
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -89,6 +93,19 @@ export default function Layout() {
             </nav>
 
             <div className="flex items-center space-x-4">
+              {/* Dark Mode Toggle */}
+              <button
+                onClick={toggleTheme}
+                className="p-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+              >
+                {theme === 'dark' ? (
+                  <FiSun className="w-5 h-5" />
+                ) : (
+                  <FiMoon className="w-5 h-5" />
+                )}
+              </button>
+
               {/* Profile Dropdown (Desktop) */}
               <div className="hidden md:block relative" ref={dropdownRef}>
                 <button
@@ -106,9 +123,6 @@ export default function Layout() {
                       {(user?.display_name || user?.username || 'U')[0].toUpperCase()}
                     </div>
                   )}
-                  <span className="text-sm font-medium">
-                    {user?.display_name || user?.username}
-                  </span>
                   <FiChevronDown className={`w-4 h-4 transition-transform ${profileDropdownOpen ? 'rotate-180' : ''}`} />
                 </button>
 

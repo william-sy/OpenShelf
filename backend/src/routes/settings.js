@@ -107,6 +107,8 @@ router.get('/labels', authenticateToken, (req, res) => {
       baseUrl: settings?.label_base_url || '',
       labelWidth: settings?.label_width || 210,
       labelHeight: settings?.label_height || 297,
+      orientation: settings?.label_orientation || 'portrait',
+      fontSize: settings?.label_font_size || 12,
       qrSize: settings?.label_qr_size || 180,
       coverSize: settings?.label_cover_size || 60,
       showTitle: settings?.label_show_title !== undefined ? Boolean(settings.label_show_title) : true,
@@ -131,7 +133,7 @@ router.get('/labels', authenticateToken, (req, res) => {
 router.put('/labels', authenticateToken, requireAdmin, (req, res) => {
   try {
     const { 
-      baseUrl, labelWidth, labelHeight, qrSize, coverSize,
+      baseUrl, labelWidth, labelHeight, orientation, fontSize, qrSize, coverSize,
       showTitle, showType, showCreators, showCover,
       showIsbn, showPublisher, showYear, showLocation, showUrl
     } = req.body;
@@ -141,6 +143,8 @@ router.put('/labels', authenticateToken, requireAdmin, (req, res) => {
       label_base_url: baseUrl,
       label_width: labelWidth,
       label_height: labelHeight,
+      label_orientation: orientation,
+      label_font_size: fontSize,
       label_qr_size: qrSize,
       label_cover_size: coverSize,
       label_show_title: showTitle,
@@ -160,6 +164,8 @@ router.put('/labels', authenticateToken, requireAdmin, (req, res) => {
         baseUrl: settings.label_base_url || '',
         labelWidth: settings.label_width || 210,
         labelHeight: settings.label_height || 297,
+        orientation: settings.label_orientation || 'portrait',
+        fontSize: settings.label_font_size || 12,
         qrSize: settings.label_qr_size || 180,
         coverSize: settings.label_cover_size || 60,
         showTitle: Boolean(settings.label_show_title),

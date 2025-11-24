@@ -80,6 +80,16 @@ try {
     console.log('✓ Added label_show_url column');
   }
   
+  if (!columnNames.includes('label_orientation')) {
+    db.prepare('ALTER TABLE api_settings ADD COLUMN label_orientation TEXT DEFAULT "portrait"').run();
+    console.log('✓ Added label_orientation column');
+  }
+  
+  if (!columnNames.includes('label_font_size')) {
+    db.prepare('ALTER TABLE api_settings ADD COLUMN label_font_size INTEGER DEFAULT 12').run();
+    console.log('✓ Added label_font_size column');
+  }
+  
   console.log('Migration completed successfully!');
 } catch (error) {
   console.error('Migration failed:', error);

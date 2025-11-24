@@ -350,9 +350,9 @@ export default function ItemDetail() {
               {item.file_path && item.type === 'ebook' && (
                 <div>
                   <p className="text-sm text-gray-600 dark:text-gray-400">File</p>
-                  <p className="font-medium flex items-center gap-1 text-gray-900 dark:text-gray-100">
-                    <FiFile className="w-4 h-4" />
-                    {item.file_path.split('/').pop().split('_').slice(3).join('_') || 'Ebook file attached'}
+                  <p className="font-medium flex items-center gap-1 text-gray-900 dark:text-gray-100 break-all">
+                    <FiFile className="w-4 h-4 flex-shrink-0" />
+                    <span className="break-all">{item.file_path.split('/').pop().split('_').slice(3).join('_') || 'Ebook file attached'}</span>
                   </p>
                 </div>
               )}
@@ -713,7 +713,7 @@ export default function ItemDetail() {
               </div>
               
               <div className="border-2 border-gray-300 dark:border-gray-600 rounded-lg overflow-auto bg-gray-50 dark:bg-gray-700 p-4 mb-4 flex items-center justify-center">
-                <div style={{ transform: 'scale(0.8)', transformOrigin: 'center' }}>
+                <div style={{ zoom: 0.8 }}>
                   <ItemLabel item={item} settings={labelSettings} />
                 </div>
               </div>
@@ -788,7 +788,6 @@ export default function ItemDetail() {
           @page {
             margin: 0;
             padding: 0;
-            size: ${labelSettings?.labelWidth || 210}mm ${labelSettings?.labelHeight || 297}mm;
           }
           
           body {

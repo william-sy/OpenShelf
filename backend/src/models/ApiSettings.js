@@ -50,6 +50,14 @@ export const ApiSettings = {
         updates.push('label_height = ?');
         values.push(settingsData.label_height || 297);
       }
+      if (settingsData.label_orientation !== undefined) {
+        updates.push('label_orientation = ?');
+        values.push(settingsData.label_orientation || 'portrait');
+      }
+      if (settingsData.label_font_size !== undefined) {
+        updates.push('label_font_size = ?');
+        values.push(settingsData.label_font_size || 12);
+      }
       if (settingsData.label_show_title !== undefined) {
         updates.push('label_show_title = ?');
         values.push(settingsData.label_show_title ? 1 : 0);

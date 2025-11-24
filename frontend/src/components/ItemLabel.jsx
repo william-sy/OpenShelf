@@ -16,6 +16,7 @@ export default function ItemLabel({ item, settings }) {
     baseUrl: window.location.origin,
     labelWidth: 210,
     labelHeight: 297,
+    orientation: 'portrait',
     qrSize: 180,
     coverSize: 60,
     showTitle: true,
@@ -29,9 +30,8 @@ export default function ItemLabel({ item, settings }) {
     showUrl: true,
   };
 
-  // Debug: Log settings to console
-  console.log('ItemLabel settings:', labelSettings);
-  console.log('Item data:', item);
+  // Determine if we should use landscape layout
+  const isLandscape = labelSettings.orientation === 'landscape';
 
   const itemUrl = `${labelSettings.baseUrl}/items/${item.id}`;
   const coverImageUrl = getImageUrl(item.cover_url);
@@ -42,42 +42,59 @@ export default function ItemLabel({ item, settings }) {
   };
 
   // Calculate responsive sizes based on label dimensions
+  const isVerySmallLabel = labelSettings.labelHeight < 40;
   const isSmallLabel = labelSettings.labelWidth < 100 || labelSettings.labelHeight < 100;
   const qrSize = labelSettings.qrSize || 180;
   const coverSize = labelSettings.coverSize || 60;
   
-  const padding = isSmallLabel ? '4px' : '8px';
-  const titleSize = isSmallLabel ? '10px' : '14px';
-  const creatorSize = isSmallLabel ? '8px' : '11px';
-  const typeSize = isSmallLabel ? '6px' : '9px';
-  const infoSize = isSmallLabel ? '7px' : '10px';
-  const urlSize = isSmallLabel ? '6px' : '8px';
-  const spacing = isSmallLabel ? '4px' : '6px';
+  // Use configurable base font size
+  const baseFontSize = labelSettings.fontSize || 12;
+  
+  const padding = isVerySmallLabel ? '2px' : isSmallLabel ? '4px' : '8px';
+  const titleSize = isVerySmallLabel ? `${baseFontSize * 0.67}px` : isSmallLabel ? `${baseFontSize * 0.83}px` : `${baseFontSize * 1.17}px`;
+  const creatorSize = isVerySmallLabel ? `${baseFontSize * 0.5}px` : isSmallLabel ? `${baseFontSize * 0.67}px` : `${baseFontSize * 0.92}px`;
+  const typeSize = isVerySmallLabel ? `${baseFontSize * 0.42}px` : isSmallLabel ? `${baseFontSize * 0.5}px` : `${baseFontSize * 0.75}px`;
+  const infoSize = isVerySmallLabel ? `${baseFontSize * 0.5}px` : isSmallLabel ? `${baseFontSize * 0.58}px` : `${baseFontSize * 0.83}px`;
+  const urlSize = isVerySmallLabel ? `${baseFontSize * 0.42}px` : isSmallLabel ? `${baseFontSize * 0.5}px` : `${baseFontSize * 0.67}px`;
+  const spacing = isVerySmallLabel ? '2px' : isSmallLabel ? '4px' : '6px';
 
   return (
     <div 
       style={{
         width: `${labelSettings.labelWidth}mm`,
         height: `${labelSettings.labelHeight}mm`,
-        maxWidth: `${labelSettings.labelWidth}mm`,
-        maxHeight: `${labelSettings.labelHeight}mm`,
-        pageBreakAfter: 'always',
-        backgroundColor: 'white',
+        minHeight: `${labelSettings.labelHeight}mm`,
         padding: padding,
         display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        textAlign: 'center',
+        flexDirection: isLandscape ? 'row' : 'column',
+        alignItems: isLandscape ? 'flex-start' : 'center',
+        justifyContent: isLandscape ? 'flex-start' : 'space-between',
+        textAlign: isLandscape ? 'left' : 'center',
         color: '#000',
         boxSizing: 'border-box',
         overflow: 'hidden',
-        position: 'relative',
+        gap: spacing,
+        flexWrap: 'nowrap',
+        pageBreakInside: 'avoid',
       }}
+      className="label-item"
     >
-      {/* Cover Image */}
+      {/* QR Code - Always first */}
+      <div style={{
+        padding: '4px',
+        flexShrink: 0,
+      }}>
+        <QRCodeSVG
+          value={itemUrl}
+          size={qrSize}
+          level="H"
+          includeMargin={false}
+        />
+      </div>
+
+      {/* Cover Image - Second */}
       {labelSettings.showCover && coverImageUrl && (
-        <div style={{ marginBottom: spacing, flexShrink: 0 }}>
+        <div style={{ flexShrink: 0 }}>
           <img 
             src={coverImageUrl} 
             alt={item.title}
@@ -92,24 +109,9 @@ export default function ItemLabel({ item, settings }) {
         </div>
       )}
 
-      {/* QR Code */}
-      <div style={{
-        marginBottom: spacing,
-        backgroundColor: 'white',
-        padding: '4px',
-        flexShrink: 0,
-      }}>
-        <QRCodeSVG
-          value={itemUrl}
-          size={qrSize}
-          level="H"
-          includeMargin={false}
-        />
-      </div>
-
-      {/* Item Information */}
+      {/* Item Information - Third */}
       <div style={{ 
-        width: '100%',
+        width: isLandscape ? 'auto' : '100%',
         flexGrow: 1,
         display: 'flex',
         flexDirection: 'column',

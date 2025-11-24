@@ -20,8 +20,19 @@ import readingStatusRoutes from './routes/readingStatus.js';
 import adminRoutes from './routes/admin.js';
 import filesRoutes from './routes/files.js';
 
+// Import migrations
+import { runMigrations } from './config/migrations.js';
+
 // Load environment variables
 dotenv.config();
+
+// Run database migrations on startup
+try {
+  runMigrations();
+} catch (error) {
+  console.error('Failed to run migrations. Exiting...');
+  process.exit(1);
+}
 
 const app = express();
 const PORT = process.env.PORT || 3001;

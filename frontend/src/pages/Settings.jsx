@@ -5,6 +5,7 @@ import { useCurrencyStore } from '../store/currencyStore';
 import toast from 'react-hot-toast';
 import api from '../services/api';
 import { FiUser, FiMail, FiLock, FiSave, FiMoon, FiSun, FiKey, FiCheck, FiDollarSign, FiShield } from 'react-icons/fi';
+import { APP_VERSION, APP_NAME, APP_DESCRIPTION } from '../config/version';
 
 export default function Settings() {
   const { user, updateUser, isAdmin } = useAuthStore();
@@ -554,10 +555,10 @@ export default function Settings() {
 
       {/* About */}
       <div className="card">
-        <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 dark:text-gray-100 mb-4">About OpenShelf</h2>
-        <div className="space-y-2 text-gray-600 dark:text-gray-400 dark:text-gray-400">
-          <p>Version 1.0.0</p>
-          <p>A modern, self-hosted library management system for your physical media collection.</p>
+        <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-4">About {APP_NAME}</h2>
+        <div className="space-y-2 text-gray-600 dark:text-gray-400">
+          <p>Version {APP_VERSION}</p>
+          <p>{APP_DESCRIPTION}</p>
           <p className="pt-4 border-t border-gray-200 dark:border-gray-700 mt-4">
             <a
               href="https://github.com/william-sy/OpenShelf"

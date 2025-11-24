@@ -9,8 +9,10 @@ export default function LabelSettings() {
     baseUrl: '',
     labelWidth: 210,
     labelHeight: 297,
+    orientation: 'portrait',
     qrSize: 180,
     coverSize: 60,
+    fontSize: 100,
     showTitle: true,
     showType: true,
     showCreators: true,
@@ -145,7 +147,7 @@ export default function LabelSettings() {
           <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
             Label Dimensions
           </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Width (mm)
@@ -155,7 +157,7 @@ export default function LabelSettings() {
                 name="labelWidth"
                 value={settings.labelWidth}
                 onChange={handleChange}
-                min="50"
+                min="20"
                 max="500"
                 className="input w-full"
                 required
@@ -170,11 +172,26 @@ export default function LabelSettings() {
                 name="labelHeight"
                 value={settings.labelHeight}
                 onChange={handleChange}
-                min="50"
+                min="20"
                 max="500"
                 className="input w-full"
                 required
               />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Orientation
+              </label>
+              <select
+                name="orientation"
+                value={settings.orientation}
+                onChange={handleChange}
+                className="input w-full"
+                required
+              >
+                <option value="portrait">Portrait</option>
+                <option value="landscape">Landscape</option>
+              </select>
             </div>
           </div>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
@@ -224,6 +241,25 @@ export default function LabelSettings() {
               />
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                 Recommended: 40-60px for small labels, 60-100px for large labels
+              </p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Base Font Size (px)
+              </label>
+              <input
+                type="number"
+                name="fontSize"
+                value={settings.fontSize}
+                onChange={handleChange}
+                min="6"
+                max="24"
+                step="1"
+                className="input w-full"
+                required
+              />
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                Base font size - titles and info will scale proportionally. Recommended: 8-10px for small labels, 12-14px for large labels
               </p>
             </div>
           </div>

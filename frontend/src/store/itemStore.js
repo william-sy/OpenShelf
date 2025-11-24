@@ -16,10 +16,6 @@ export const useItemStore = create((set, get) => ({
   setFilter: (filter) => {
     const currentFilter = get().filter;
     const newFilter = { ...currentFilter, ...filter };
-    console.log('setFilter called');
-    console.log('Current filter:', currentFilter);
-    console.log('Update:', filter);
-    console.log('New filter:', newFilter);
     set({ filter: newFilter });
   },
 
@@ -39,16 +35,13 @@ export const useItemStore = create((set, get) => ({
     set({ loading: true, error: null });
     try {
       const { type, search, wishlist, favorite } = get().filter;
-      console.log('fetchItems called with filter:', { type, search, wishlist, favorite });
       const params = new URLSearchParams();
       if (type) params.append('type', type);
       if (search) params.append('search', search);
       if (wishlist !== null) params.append('wishlist', wishlist);
       if (favorite !== null) params.append('favorite', favorite);
       
-      console.log('API request: /api/items?' + params.toString());
       const response = await api.get(`/api/items?${params.toString()}`);
-      console.log('Received', response.data.length, 'items');
       set({ items: response.data, loading: false });
       
       // Also update allItems if no filters are applied
