@@ -23,6 +23,7 @@ export const Item = {
       rating,
       condition,
       location,
+      spine_width,
       purchase_date,
       purchase_price,
       tmdb_id,
@@ -38,10 +39,10 @@ export const Item = {
       INSERT INTO items (
         user_id, type, title, subtitle, creators, isbn, barcode, publisher, 
         publish_date, description, cover_url, page_count, language,
-        metadata, notes, tags, rating, condition, location,
+        metadata, notes, tags, rating, condition, location, spine_width,
         purchase_date, purchase_price, tmdb_id, jellyfin_id, jellyfin_url, file_path,
         comicvine_id, wishlist, favorite
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     // Convert old authors format to creators if needed
@@ -67,6 +68,7 @@ export const Item = {
       rating || null,
       condition || null,
       location || null,
+      spine_width || null,
       purchase_date || null,
       purchase_price || null,
       tmdb_id || null,
@@ -341,7 +343,7 @@ export const Item = {
     const allowed = [
       'type', 'title', 'subtitle', 'creators', 'isbn', 'barcode', 'publisher',
       'publish_date', 'description', 'cover_url', 'page_count', 'language',
-      'metadata', 'notes', 'tags', 'rating', 'condition', 'location',
+      'metadata', 'notes', 'tags', 'rating', 'condition', 'location', 'spine_width',
       'purchase_date', 'purchase_price', 'tmdb_id', 'jellyfin_id', 'jellyfin_url', 'file_path',
       'comicvine_id', 'wishlist', 'favorite'
     ];

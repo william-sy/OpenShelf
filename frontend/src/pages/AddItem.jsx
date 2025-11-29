@@ -45,6 +45,7 @@ export default function AddItem() {
     rating: '',
     condition: '',
     location: '',
+    spine_width: '',
     purchase_date: '',
     purchase_price: '',
     tmdb_id: '',
@@ -1150,16 +1151,34 @@ export default function AddItem() {
             </div>
           </div>
 
-          <div>
-            <label className="label">Location</label>
-            <input
-              type="text"
-              name="location"
-              value={formData.location}
-              onChange={handleChange}
-              placeholder="e.g., Shelf A, Box 3"
-              className="input"
-            />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="label">Location</label>
+              <input
+                type="text"
+                name="location"
+                value={formData.location}
+                onChange={handleChange}
+                placeholder="e.g., Shelf A, Box 3"
+                className="input"
+              />
+            </div>
+            <div>
+              <label className="label">Spine Width (mm)</label>
+              <input
+                type="number"
+                name="spine_width"
+                value={formData.spine_width}
+                onChange={handleChange}
+                placeholder="e.g., 15"
+                min="0"
+                max="100"
+                className="input"
+              />
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                Thickness of book spine (optional, for wrap-around labels)
+              </p>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

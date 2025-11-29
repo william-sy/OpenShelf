@@ -14,6 +14,23 @@ export function runMigrations() {
     
     let migrationsRun = 0;
     
+    // Items table migrations
+    const itemsMigrations = [
+      { column: 'spine_width', sql: 'ALTER TABLE items ADD COLUMN spine_width INTEGER DEFAULT NULL' },
+    ];
+    
+    // Check items table
+    const itemsTableInfo = db.prepare("PRAGMA table_info(items)").all();
+    const itemsColumnNames = itemsTableInfo.map(col => col.name);
+    
+    for (const migration of itemsMigrations) {
+      if (!itemsColumnNames.includes(migration.column)) {
+        db.prepare(migration.sql).run();
+        console.log(`  ✓ Added items.${migration.column} column`);
+        migrationsRun++;
+      }
+    }
+    
     // Label settings migrations
     const migrations = [
       { column: 'label_base_url', sql: 'ALTER TABLE api_settings ADD COLUMN label_base_url TEXT' },
@@ -32,6 +49,11 @@ export function runMigrations() {
       { column: 'label_show_url', sql: 'ALTER TABLE api_settings ADD COLUMN label_show_url INTEGER DEFAULT 1' },
       { column: 'label_orientation', sql: 'ALTER TABLE api_settings ADD COLUMN label_orientation TEXT DEFAULT "portrait"' },
       { column: 'label_font_size', sql: 'ALTER TABLE api_settings ADD COLUMN label_font_size INTEGER DEFAULT 12' },
+      { column: 'label_image_dpi', sql: 'ALTER TABLE api_settings ADD COLUMN label_image_dpi INTEGER DEFAULT 302' },
+      { column: 'label_text_align', sql: 'ALTER TABLE api_settings ADD COLUMN label_text_align TEXT DEFAULT "left"' },
+      { column: 'label_show_spine', sql: 'ALTER TABLE api_settings ADD COLUMN label_show_spine INTEGER DEFAULT 0' },
+      { column: 'label_spine_width', sql: 'ALTER TABLE api_settings ADD COLUMN label_spine_width INTEGER DEFAULT 10' },
+      { column: 'label_mirror_layout', sql: 'ALTER TABLE api_settings ADD COLUMN label_mirror_layout INTEGER DEFAULT 0' },
     ];
     
     // Run each migration if needed

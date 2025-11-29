@@ -12,7 +12,12 @@ export default function LabelSettings() {
     orientation: 'portrait',
     qrSize: 180,
     coverSize: 60,
-    fontSize: 100,
+    fontSize: 12,
+    imageDpi: 302,
+    textAlign: 'left',
+    showSpine: false,
+    spineWidth: 10,
+    mirrorLayout: false,
     showTitle: true,
     showType: true,
     showCreators: true,
@@ -47,9 +52,29 @@ export default function LabelSettings() {
   const loadSettings = async () => {
     try {
       const response = await api.get('/api/settings/labels');
+      const data = response.data;
       setSettings({
-        ...response.data,
-        baseUrl: response.data.baseUrl || window.location.origin
+        baseUrl: data.baseUrl || window.location.origin,
+        labelWidth: Number(data.labelWidth) || 210,
+        labelHeight: Number(data.labelHeight) || 297,
+        orientation: data.orientation || 'portrait',
+        qrSize: Number(data.qrSize) || 180,
+        coverSize: Number(data.coverSize) || 60,
+        fontSize: Number(data.fontSize) || 12,
+        imageDpi: Number(data.imageDpi) || 302,
+        textAlign: data.textAlign || 'left',
+        showSpine: Boolean(data.showSpine),
+        spineWidth: Number(data.spineWidth) || 10,
+        mirrorLayout: Boolean(data.mirrorLayout),
+        showTitle: data.showTitle !== undefined ? Boolean(data.showTitle) : true,
+        showType: data.showType !== undefined ? Boolean(data.showType) : true,
+        showCreators: data.showCreators !== undefined ? Boolean(data.showCreators) : true,
+        showCover: data.showCover !== undefined ? Boolean(data.showCover) : true,
+        showIsbn: Boolean(data.showIsbn),
+        showPublisher: Boolean(data.showPublisher),
+        showYear: Boolean(data.showYear),
+        showLocation: Boolean(data.showLocation),
+        showUrl: data.showUrl !== undefined ? Boolean(data.showUrl) : true,
       });
     } catch (error) {
       console.error('Error loading label settings:', error);
@@ -93,9 +118,18 @@ export default function LabelSettings() {
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
+    let finalValue = value;
+    
+    // Convert number inputs to actual numbers
+    if (type === 'number') {
+      finalValue = value === '' ? '' : Number(value);
+    } else if (type === 'checkbox') {
+      finalValue = checked;
+    }
+    
     setSettings(prev => ({
       ...prev,
-      [name]: type === 'checkbox' ? checked : value
+      [name]: finalValue
     }));
   };
 
@@ -262,6 +296,101 @@ export default function LabelSettings() {
                 Base font size - titles and info will scale proportionally. Recommended: 8-10px for small labels, 12-14px for large labels
               </p>
             </div>
+          </div>
+        </div>
+
+        {/* Layout & Print Options */}
+        <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
+            Layout & Print Options
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Image DPI (Quality)
+              </label>
+              <input
+                type="number"
+                name="imageDpi"
+                value={settings.imageDpi}
+                onChange={handleChange}
+                min="72"
+                max="600"
+                step="10"
+                className="input w-full"
+                required
+              />
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                Higher DPI = better quality but larger file. Recommended: 300 for print, 150 for screen
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Text Alignment
+              </label>
+              <select
+                name="textAlign"
+                value={settings.textAlign}
+                onChange={handleChange}
+                className="input w-full"
+              >
+                <option value="left">Left</option>
+                <option value="center">Center</option>
+                <option value="right">Right</option>
+              </select>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                Alignment for title and item information
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Spine Width (mm)
+              </label>
+              <input
+                type="number"
+                name="spineWidth"
+                value={settings.spineWidth}
+                onChange={handleChange}
+                min="0"
+                max="50"
+                step="1"
+                className="input w-full"
+                required
+              />
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                Book spine thickness for wrap-around labels. Set to 0 if not needed
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                name="showSpine"
+                checked={settings.showSpine}
+                onChange={handleChange}
+                className="w-4 h-4 text-primary-600 rounded focus:ring-primary-500"
+              />
+              <span className="text-sm text-gray-700 dark:text-gray-300">
+                Show spine indicator (for wrap-around labels)
+              </span>
+            </label>
+
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                name="mirrorLayout"
+                checked={settings.mirrorLayout}
+                onChange={handleChange}
+                className="w-4 h-4 text-primary-600 rounded focus:ring-primary-500"
+              />
+              <span className="text-sm text-gray-700 dark:text-gray-300">
+                Mirror layout (QR on right, info on left - for back cover with QR on front)
+              </span>
+            </label>
           </div>
         </div>
 

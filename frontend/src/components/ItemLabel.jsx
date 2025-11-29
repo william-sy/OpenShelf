@@ -19,6 +19,12 @@ export default function ItemLabel({ item, settings }) {
     orientation: 'portrait',
     qrSize: 180,
     coverSize: 60,
+    fontSize: 12,
+    imageDpi: 302,
+    textAlign: 'left',
+    showSpine: false,
+    spineWidth: 10,
+    mirrorLayout: false,
     showTitle: true,
     showType: true,
     showCreators: true,
@@ -32,6 +38,8 @@ export default function ItemLabel({ item, settings }) {
 
   // Determine if we should use landscape layout
   const isLandscape = labelSettings.orientation === 'landscape';
+  // Mirror layout flips QR and content positions
+  const isMirrored = labelSettings.mirrorLayout;
 
   const itemUrl = `${labelSettings.baseUrl}/items/${item.id}`;
   const coverImageUrl = getImageUrl(item.cover_url);
@@ -58,70 +66,69 @@ export default function ItemLabel({ item, settings }) {
   const urlSize = isVerySmallLabel ? `${baseFontSize * 0.42}px` : isSmallLabel ? `${baseFontSize * 0.5}px` : `${baseFontSize * 0.67}px`;
   const spacing = isVerySmallLabel ? '2px' : isSmallLabel ? '4px' : '6px';
 
-  return (
-    <div 
-      style={{
-        width: `${labelSettings.labelWidth}mm`,
-        height: `${labelSettings.labelHeight}mm`,
-        minHeight: `${labelSettings.labelHeight}mm`,
-        padding: padding,
-        display: 'flex',
-        flexDirection: isLandscape ? 'row' : 'column',
-        alignItems: isLandscape ? 'flex-start' : 'center',
-        justifyContent: isLandscape ? 'flex-start' : 'space-between',
-        textAlign: isLandscape ? 'left' : 'center',
-        color: '#000',
-        boxSizing: 'border-box',
-        overflow: 'hidden',
-        gap: spacing,
-        flexWrap: 'nowrap',
-        pageBreakInside: 'avoid',
-      }}
-      className="label-item"
-    >
-      {/* QR Code - Always first */}
-      <div style={{
-        padding: '4px',
-        flexShrink: 0,
-      }}>
-        <QRCodeSVG
-          value={itemUrl}
-          size={qrSize}
-          level="H"
-          includeMargin={false}
-        />
-      </div>
+  // QR Code section
+  const qrSection = (
+    <div style={{
+      padding: '4px',
+      flexShrink: 0,
+    }}>
+      <QRCodeSVG
+        value={itemUrl}
+        size={qrSize}
+        level="H"
+        includeMargin={false}
+      />
+    </div>
+  );
 
-      {/* Cover Image - Second */}
-      {labelSettings.showCover && coverImageUrl && (
-        <div style={{ flexShrink: 0 }}>
-          <img 
-            src={coverImageUrl} 
-            alt={item.title}
-            style={{
-              maxHeight: `${coverSize}px`,
-              maxWidth: `${coverSize}px`,
-              objectFit: 'contain',
-            }}
-            crossOrigin="anonymous"
-            onError={(e) => { 
-              console.error('Failed to load cover image:', coverImageUrl, 'for item:', item.title);
-              e.target.style.display = 'none'; 
-            }}
-          />
-        </div>
-      )}
+  // Cover Image section
+  const coverSection = labelSettings.showCover && coverImageUrl && (
+    <div style={{ flexShrink: 0 }}>
+      <img 
+        src={coverImageUrl} 
+        alt={item.title}
+        style={{
+          maxHeight: `${coverSize}px`,
+          maxWidth: `${coverSize}px`,
+          objectFit: 'contain',
+          imageRendering: labelSettings.imageDpi > 200 ? 'high-quality' : 'auto',
+        }}
+        crossOrigin="anonymous"
+        onError={(e) => { 
+          console.error('Failed to load cover image:', coverImageUrl, 'for item:', item.title);
+          e.target.style.display = 'none'; 
+        }}
+      />
+    </div>
+  );
 
-      {/* Item Information - Third */}
-      <div style={{ 
-        width: isLandscape ? 'auto' : '100%',
-        flexGrow: 1,
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'center',
-        overflow: 'hidden',
-        maxHeight: '100%',
-      }}>
+  // Spine indicator section - use item's spine_width if available, otherwise use global setting
+  const actualSpineWidth = item.spine_width || labelSettings.spineWidth;
+  const spineSection = labelSettings.showSpine && actualSpineWidth > 0 && (
+    <div style={{
+      width: isLandscape ? `${actualSpineWidth}mm` : '100%',
+      height: isLandscape ? '100%' : `${actualSpineWidth}mm`,
+      backgroundColor: '#ddd',
+      borderLeft: isLandscape ? '2px dashed #999' : 'none',
+      borderRight: isLandscape ? '2px dashed #999' : 'none',
+      borderTop: !isLandscape ? '2px dashed #999' : 'none',
+      borderBottom: !isLandscape ? '2px dashed #999' : 'none',
+      flexShrink: 0,
+    }} />
+  );
+
+  // Text/Info section
+  const infoSection = (
+    <div style={{ 
+      width: isLandscape ? 'auto' : '100%',
+      flexGrow: 1,
+      display: 'flex',
+      flexDirection: 'column',
+      justifyContent: 'center',
+      overflow: 'hidden',
+      maxHeight: '100%',
+      textAlign: labelSettings.textAlign,
+    }}>
         {labelSettings.showTitle && (
           <div style={{
             fontSize: titleSize,
@@ -222,26 +229,63 @@ export default function ItemLabel({ item, settings }) {
             📍 {item.location}
           </div>
         )}
-      </div>
-
-      {/* URL at bottom */}
-      {labelSettings.showUrl && (
-        <div style={{ 
-          width: '100%',
-          marginTop: spacing,
-          flexShrink: 0,
-        }}>
-          <div style={{
-            fontSize: urlSize,
-            color: '#ccc',
-            fontFamily: 'monospace',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
+        
+        {/* URL at bottom */}
+        {labelSettings.showUrl && (
+          <div style={{ 
+            width: '100%',
+            marginTop: spacing,
           }}>
-            {itemUrl}
+            <div style={{
+              fontSize: urlSize,
+              color: '#ccc',
+              fontFamily: 'monospace',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}>
+              {itemUrl}
+            </div>
           </div>
-        </div>
+        )}
+      </div>
+  );
+
+  return (
+    <div 
+      style={{
+        width: `${labelSettings.labelWidth}mm`,
+        height: `${labelSettings.labelHeight}mm`,
+        minHeight: `${labelSettings.labelHeight}mm`,
+        padding: padding,
+        display: 'flex',
+        flexDirection: isLandscape ? 'row' : 'column',
+        alignItems: isLandscape ? 'flex-start' : 'center',
+        justifyContent: isLandscape ? 'flex-start' : 'space-between',
+        color: '#000',
+        boxSizing: 'border-box',
+        overflow: 'hidden',
+        gap: spacing,
+        flexWrap: 'nowrap',
+        pageBreakInside: 'avoid',
+      }}
+      className="label-item"
+    >
+      {/* Layout order depends on mirror setting */}
+      {!isMirrored ? (
+        <>
+          {qrSection}
+          {spineSection}
+          {coverSection}
+          {infoSection}
+        </>
+      ) : (
+        <>
+          {infoSection}
+          {coverSection}
+          {spineSection}
+          {qrSection}
+        </>
       )}
     </div>
   );

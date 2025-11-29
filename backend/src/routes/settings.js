@@ -120,6 +120,11 @@ router.get('/labels', authenticateToken, (req, res) => {
       showYear: settings?.label_show_year !== undefined ? Boolean(settings.label_show_year) : false,
       showLocation: settings?.label_show_location !== undefined ? Boolean(settings.label_show_location) : false,
       showUrl: settings?.label_show_url !== undefined ? Boolean(settings.label_show_url) : true,
+      imageDpi: settings?.label_image_dpi || 302,
+      textAlign: settings?.label_text_align || 'left',
+      showSpine: settings?.label_show_spine !== undefined ? Boolean(settings.label_show_spine) : false,
+      spineWidth: settings?.label_spine_width || 10,
+      mirrorLayout: settings?.label_mirror_layout !== undefined ? Boolean(settings.label_mirror_layout) : false,
     };
     
     res.json(labelSettings);
@@ -135,7 +140,8 @@ router.put('/labels', authenticateToken, requireAdmin, (req, res) => {
     const { 
       baseUrl, labelWidth, labelHeight, orientation, fontSize, qrSize, coverSize,
       showTitle, showType, showCreators, showCover,
-      showIsbn, showPublisher, showYear, showLocation, showUrl
+      showIsbn, showPublisher, showYear, showLocation, showUrl,
+      imageDpi, textAlign, showSpine, spineWidth, mirrorLayout
     } = req.body;
     
     // Store settings under the admin's user ID (system-wide settings)
@@ -156,6 +162,11 @@ router.put('/labels', authenticateToken, requireAdmin, (req, res) => {
       label_show_year: showYear,
       label_show_location: showLocation,
       label_show_url: showUrl,
+      label_image_dpi: imageDpi,
+      label_text_align: textAlign,
+      label_show_spine: showSpine,
+      label_spine_width: spineWidth,
+      label_mirror_layout: mirrorLayout,
     });
     
     res.json({
@@ -177,6 +188,11 @@ router.put('/labels', authenticateToken, requireAdmin, (req, res) => {
         showYear: Boolean(settings.label_show_year),
         showLocation: Boolean(settings.label_show_location),
         showUrl: Boolean(settings.label_show_url),
+        imageDpi: settings.label_image_dpi || 302,
+        textAlign: settings.label_text_align || 'left',
+        showSpine: Boolean(settings.label_show_spine),
+        spineWidth: settings.label_spine_width || 10,
+        mirrorLayout: Boolean(settings.label_mirror_layout),
       }
     });
   } catch (error) {

@@ -102,6 +102,26 @@ export const ApiSettings = {
         updates.push('label_show_url = ?');
         values.push(settingsData.label_show_url ? 1 : 0);
       }
+      if (settingsData.label_image_dpi !== undefined) {
+        updates.push('label_image_dpi = ?');
+        values.push(settingsData.label_image_dpi || 302);
+      }
+      if (settingsData.label_text_align !== undefined) {
+        updates.push('label_text_align = ?');
+        values.push(settingsData.label_text_align || 'left');
+      }
+      if (settingsData.label_show_spine !== undefined) {
+        updates.push('label_show_spine = ?');
+        values.push(settingsData.label_show_spine ? 1 : 0);
+      }
+      if (settingsData.label_spine_width !== undefined) {
+        updates.push('label_spine_width = ?');
+        values.push(settingsData.label_spine_width || 10);
+      }
+      if (settingsData.label_mirror_layout !== undefined) {
+        updates.push('label_mirror_layout = ?');
+        values.push(settingsData.label_mirror_layout ? 1 : 0);
+      }
       
       if (updates.length === 0) return existing;
       

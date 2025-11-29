@@ -372,6 +372,14 @@ export default function ItemDetail() {
                   </p>
                 </div>
               )}
+              {item.spine_width && (
+                <div>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Spine Width</p>
+                  <p className="font-medium text-gray-900 dark:text-gray-100">
+                    {item.spine_width} mm
+                  </p>
+                </div>
+              )}
               {item.purchase_date && (
                 <div>
                   <p className="text-sm text-gray-600 dark:text-gray-400">Purchase Date</p>
