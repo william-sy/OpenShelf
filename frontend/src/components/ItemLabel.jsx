@@ -1,14 +1,5 @@
 import { QRCodeSVG } from 'qrcode.react';
-import { API_URL } from '../services/api';
-
-// Helper to convert relative API URLs to absolute URLs
-const getImageUrl = (url) => {
-  if (!url) return null;
-  if (url.startsWith('http://') || url.startsWith('https://')) return url;
-  if (url.startsWith('/api/')) return `${API_URL}${url}`;
-  if (url.startsWith('/')) return `${API_URL}${url}`;
-  return url;
-};
+import { getImageUrl } from '../utils/imageUrl';
 
 export default function ItemLabel({ item, settings }) {
   // Use provided settings or defaults

@@ -1,8 +1,21 @@
 import { useState, useEffect } from 'react';
 import { ReactReader } from 'react-reader';
 
-export default function EpubReader({ url }) {
-  const [location, setLocation] = useState(null);
+function storageKey(itemId) {
+  return `openshelf-epub-location-${itemId}`;
+}
+
+export default function EpubReader({ url, itemId }) {
+  const [location, setLocation] = useState(() =>
+    itemId ? localStorage.getItem(storageKey(itemId)) : null
+  );
+
+  const handleLocationChanged = (epubcfi) => {
+    setLocation(epubcfi);
+    if (itemId) {
+      localStorage.setItem(storageKey(itemId), epubcfi);
+    }
+  };
 
   // Fix iframe sandbox restrictions
   useEffect(() => {
@@ -27,7 +40,7 @@ export default function EpubReader({ url }) {
       <ReactReader
         url={url}
         location={location}
-        locationChanged={(epubcfi) => setLocation(epubcfi)}
+        locationChanged={handleLocationChanged}
         getRendition={(rendition) => {
           // Optional: Customize rendition
           // rendition.themes.default({ body: { 'font-family': 'Georgia, serif' } });

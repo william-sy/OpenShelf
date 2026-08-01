@@ -1,21 +1,15 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useItemStore } from '../store/itemStore';
-import { FiPlus, FiHeart, FiBook, FiDisc, FiFilm, FiPackage } from 'react-icons/fi';
-
-const typeIcons = {
-  book: FiBook,
-  comic: FiBook,
-  cd: FiDisc,
-  dvd: FiFilm,
-  bluray: FiFilm,
-  vinyl: FiDisc,
-  ebook: FiBook,
-  other: FiPackage,
-};
+import { useAuthStore } from '../store/authStore';
+import { FiPlus, FiHeart, FiFilter, FiCheck } from 'react-icons/fi';
+import toast from 'react-hot-toast';
+import { getImageUrl } from '../utils/imageUrl';
+import { MEDIA_TYPE_ORDER, getMediaTypeMeta } from '../utils/mediaType';
 
 export default function Wishlist() {
-  const { items, fetchItems, loading } = useItemStore();
+  const { items, fetchItems, loading, updateItem } = useItemStore();
+  const { canModifyItems } = useAuthStore();
   const [wishlistItems, setWishlistItems] = useState([]);
   const [selectedType, setSelectedType] = useState('all');
 
@@ -32,7 +26,20 @@ export default function Wishlist() {
     }
   }, [items, selectedType]);
 
-  const types = [...new Set(items.filter(item => item.wishlist).map(item => item.type))];
+  const types = MEDIA_TYPE_ORDER.filter((type) =>
+    items.some((item) => item.wishlist && item.type === type)
+  );
+
+  const handleMarkAcquired = async (e, item) => {
+    e.preventDefault();
+    e.stopPropagation();
+    try {
+      await updateItem(item.id, { ...item, wishlist: false });
+      toast.success(`Marked "${item.title}" as acquired`);
+    } catch (error) {
+      toast.error('Failed to update item');
+    }
+  };
 
   const getItemsByType = () => {
     const grouped = {};
@@ -66,38 +73,30 @@ export default function Wishlist() {
             {wishlistItems.length} {wishlistItems.length === 1 ? 'item' : 'items'} you want to add to your collection
           </p>
         </div>
-        <Link to="/items/new" className="btn btn-primary">
+        <Link to="/items/add" className="btn btn-primary">
           <FiPlus className="inline mr-2" />
           Add Item
         </Link>
       </div>
 
-      {/* Type Filter */}
-      {types.length > 0 && (
-        <div className="flex flex-wrap gap-2">
-          <button
-            onClick={() => setSelectedType('all')}
-            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-              selectedType === 'all'
-                ? 'bg-primary-600 text-white'
-                : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-            }`}
+      {/* Type Filter - dropdown rather than a flat chip wall, consistent
+          with the Library page's filter */}
+      {types.length > 1 && (
+        <div className="relative inline-flex items-center">
+          <FiFilter className="absolute left-3 text-gray-400 pointer-events-none w-4 h-4" />
+          <select
+            value={selectedType}
+            onChange={(e) => setSelectedType(e.target.value)}
+            aria-label="Filter wishlist by format"
+            className="input pl-9 pr-8 py-2 w-auto text-sm font-medium"
           >
-            All ({items.filter(item => item.wishlist).length})
-          </button>
-          {types.map(type => (
-            <button
-              key={type}
-              onClick={() => setSelectedType(type)}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors capitalize ${
-                selectedType === type
-                  ? 'bg-primary-600 text-white'
-                  : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-              }`}
-            >
-              {type} ({items.filter(item => item.wishlist && item.type === type).length})
-            </button>
-          ))}
+            <option value="all">All formats ({items.filter(item => item.wishlist).length})</option>
+            {types.map((type) => (
+              <option key={type} value={type}>
+                {getMediaTypeMeta(type).label} ({items.filter(item => item.wishlist && item.type === type).length})
+              </option>
+            ))}
+          </select>
         </div>
       )}
 
@@ -111,7 +110,7 @@ export default function Wishlist() {
           <p className="text-gray-600 dark:text-gray-400 mb-6">
             Add items you want to acquire to keep track of your collection goals
           </p>
-          <Link to="/items/new" className="btn btn-primary inline-flex items-center">
+          <Link to="/items/add" className="btn btn-primary inline-flex items-center">
             <FiPlus className="mr-2" />
             Add Your First Wishlist Item
           </Link>
@@ -119,7 +118,8 @@ export default function Wishlist() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {wishlistItems.map(item => {
-            const Icon = typeIcons[item.type] || FiPackage;
+            const meta = getMediaTypeMeta(item.type);
+            const Icon = meta.icon;
             return (
               <Link
                 key={item.id}
@@ -129,7 +129,7 @@ export default function Wishlist() {
                 <div className="relative">
                   {item.cover_url ? (
                     <img
-                      src={item.cover_url}
+                      src={getImageUrl(item.cover_url)}
                       alt={item.title}
                       className="w-full h-64 object-cover rounded-t-lg"
                     />
@@ -139,16 +139,29 @@ export default function Wishlist() {
                     </div>
                   )}
                   <div className="absolute top-3 right-3">
-                    <div className="bg-pink-500 text-white p-2 rounded-full shadow-lg">
-                      <FiHeart className="w-4 h-4 fill-current" />
-                    </div>
+                    {canModifyItems() ? (
+                      <button
+                        type="button"
+                        onClick={(e) => handleMarkAcquired(e, item)}
+                        className="bg-pink-500 hover:bg-green-600 text-white p-2 rounded-full shadow-lg transition-colors group/badge relative"
+                        title="Mark as acquired (remove from wishlist)"
+                        aria-label="Mark as acquired"
+                      >
+                        <FiHeart className="w-4 h-4 fill-current group-hover/badge:hidden" />
+                        <FiCheck className="w-4 h-4 hidden group-hover/badge:block" />
+                      </button>
+                    ) : (
+                      <div className="bg-pink-500 text-white p-2 rounded-full shadow-lg">
+                        <FiHeart className="w-4 h-4 fill-current" />
+                      </div>
+                    )}
                   </div>
                 </div>
 
                 <div className="p-4">
                   <div className="flex flex-wrap gap-1 mb-2">
-                    <span className="inline-block px-2 py-1 bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400 text-xs rounded-full capitalize">
-                      {item.type}
+                    <span className={`inline-block px-2 py-1 text-xs rounded-full ${meta.chip}`}>
+                      {meta.label}
                     </span>
                     {item.tags?.find(tag => tag.startsWith('Series: ')) && (
                       <span className="inline-block px-2 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 text-xs rounded-full">
@@ -190,14 +203,15 @@ export default function Wishlist() {
           </h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {Object.entries(getItemsByType()).map(([type, typeItems]) => {
-              const Icon = typeIcons[type] || FiPackage;
+              const meta = getMediaTypeMeta(type);
+              const Icon = meta.icon;
               return (
                 <div key={type} className="text-center p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                  <Icon className="w-8 h-8 mx-auto mb-2 text-primary-600 dark:text-primary-400" />
+                  <Icon className={`w-8 h-8 mx-auto mb-2 ${meta.text}`} />
                   <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
                     {typeItems.length}
                   </p>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 capitalize">{type}</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">{meta.label}</p>
                 </div>
               );
             })}

@@ -1,5 +1,20 @@
 import db from '../config/database.js';
 
+// sortBy is taken from user-controlled request query params - whitelist the
+// exact column names allowed to appear in ORDER BY. Interpolating it
+// directly (as this previously did) is a SQL injection vector: any
+// authenticated user could pass arbitrary SQL via ?sortBy=...
+const SORTABLE_COLUMNS = new Set([
+  'created_at', 'updated_at', 'title', 'rating', 'publish_date',
+  'purchase_date', 'purchase_price', 'type', 'page_count',
+]);
+
+function safeSort(filters) {
+  const sortBy = SORTABLE_COLUMNS.has(filters.sortBy) ? filters.sortBy : 'created_at';
+  const sortOrder = filters.sortOrder === 'asc' ? 'ASC' : 'DESC';
+  return `ORDER BY ${sortBy} ${sortOrder}`;
+}
+
 export const Item = {
   create(itemData) {
     const {
@@ -182,9 +197,7 @@ export const Item = {
     }
 
     // Sorting
-    const sortBy = filters.sortBy || 'created_at';
-    const sortOrder = filters.sortOrder === 'asc' ? 'ASC' : 'DESC';
-    query += ` ORDER BY ${sortBy} ${sortOrder}`;
+    query += ` ${safeSort(filters)}`;
 
     // Pagination
     if (filters.limit) {
@@ -295,9 +308,7 @@ export const Item = {
     }
 
     // Sorting
-    const sortBy = filters.sortBy || 'created_at';
-    const sortOrder = filters.sortOrder === 'asc' ? 'ASC' : 'DESC';
-    query += ` ORDER BY ${sortBy} ${sortOrder}`;
+    query += ` ${safeSort(filters)}`;
 
     // Pagination
     if (filters.limit) {

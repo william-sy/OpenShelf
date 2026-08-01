@@ -7,3 +7,8 @@ docker-compose-prod.yml
 frontend/dist/
 node_modules/
 build.sh
+.claude
+.codex
+.impeccable
+PRODUCT.md
+build.sh

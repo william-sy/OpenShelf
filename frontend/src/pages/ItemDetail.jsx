@@ -9,15 +9,7 @@ import toast from 'react-hot-toast';
 import { FiEdit2, FiTrash2, FiArrowLeft, FiCalendar, FiBook, FiMapPin, FiStar, FiHeart, FiBookOpen, FiCheckCircle, FiClock, FiLock, FiCopy, FiRefreshCw, FiFile, FiDownload, FiPrinter } from 'react-icons/fi';
 import api, { API_URL } from '../services/api';
 import ItemLabel from '../components/ItemLabel';
-
-// Helper to convert relative API URLs to absolute URLs
-const getImageUrl = (url) => {
-  if (!url) return null;
-  if (url.startsWith('http://') || url.startsWith('https://')) return url;
-  if (url.startsWith('/api/')) return `${API_URL}${url}`;
-  if (url.startsWith('/')) return `${API_URL}${url}`;
-  return url;
-};
+import { getImageUrl } from '../utils/imageUrl';
 
 export default function ItemDetail() {
   const { id } = useParams();
@@ -49,6 +41,16 @@ export default function ItemDetail() {
       }
     });
   }, [id, fetchItems, getItemById, fetchReadingStatus, navigate]);
+
+  useEffect(() => {
+    const handleEscape = (e) => {
+      if (e.key !== 'Escape') return;
+      if (showDeleteConfirm) setShowDeleteConfirm(false);
+      if (showPrintPreview) setShowPrintPreview(false);
+    };
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [showDeleteConfirm, showPrintPreview]);
 
   const handleReadingStatusChange = async (status, startDate = null, endDate = null) => {
     try {
@@ -137,7 +139,12 @@ export default function ItemDetail() {
 
   const handleJellyfinResync = async () => {
     if (!item.jellyfin_id) return;
-    
+
+    const confirmed = window.confirm(
+      'Resync with Jellyfin? This will overwrite the title, description, creators, and cover with Jellyfin\'s current data - any manual edits to these fields will be lost.'
+    );
+    if (!confirmed) return;
+
     try {
       toast.loading('Resyncing with Jellyfin...', { id: 'resync' });
       
@@ -275,8 +282,10 @@ export default function ItemDetail() {
                     <button
                       key={star}
                       onClick={() => handleRatingChange(star)}
-                      className="focus:outline-none transition-colors"
+                      className="focus:outline-none transition-colors disabled:opacity-50"
                       disabled={!canModifyItems()}
+                      aria-label={`Rate ${star} out of 5 stars`}
+                      aria-pressed={star <= (item.rating || 0)}
                     >
                       <FiStar
                         className={`w-5 h-5 ${
@@ -617,6 +626,7 @@ export default function ItemDetail() {
                       onClick={handleJellyfinResync}
                       className="btn btn-secondary flex items-center justify-center gap-2"
                       title="Update metadata from Jellyfin"
+                      aria-label="Update metadata from Jellyfin"
                     >
                       <FiRefreshCw className="inline" />
                       <span className="hidden sm:inline">Resync</span>
@@ -626,6 +636,7 @@ export default function ItemDetail() {
                     onClick={handlePrintLabel}
                     className="btn btn-secondary flex items-center justify-center gap-2"
                     title="Print QR code label for this item"
+                    aria-label="Print QR code label for this item"
                   >
                     <FiPrinter className="inline" />
                     <span className="hidden sm:inline">Print Label</span>
@@ -634,17 +645,23 @@ export default function ItemDetail() {
                     onClick={handleDuplicate}
                     className="btn btn-secondary flex items-center justify-center gap-2"
                     title="Create a copy of this item (useful for multiple editions)"
+                    aria-label="Duplicate this item"
                   >
                     <FiCopy className="inline" />
                     <span className="hidden sm:inline">Duplicate</span>
                   </button>
-                  <Link to={`/items/${id}/edit`} className="btn btn-primary flex items-center justify-center gap-2">
+                  <Link
+                    to={`/items/${id}/edit`}
+                    className="btn btn-primary flex items-center justify-center gap-2"
+                    aria-label="Edit this item"
+                  >
                     <FiEdit2 className="inline" />
                     <span className="hidden sm:inline">Edit</span>
                   </Link>
                   <button
                     onClick={() => setShowDeleteConfirm(true)}
                     className="btn btn-danger flex items-center justify-center gap-2"
+                    aria-label="Delete this item"
                   >
                     <FiTrash2 className="inline" />
                     <span className="hidden sm:inline">Delete</span>
@@ -679,9 +696,15 @@ export default function ItemDetail() {
 
       {/* Delete Confirmation Modal */}
       {showDeleteConfirm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="delete-item-title"
+          onClick={(e) => { if (e.target === e.currentTarget) setShowDeleteConfirm(false); }}
+        >
           <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full">
-            <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-4">Delete Item?</h3>
+            <h3 id="delete-item-title" className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-4">Delete Item?</h3>
             <p className="text-gray-600 dark:text-gray-400 mb-6">
               Are you sure you want to delete "{item.title}"? This action cannot be undone.
             </p>
@@ -707,15 +730,22 @@ export default function ItemDetail() {
       {showPrintPreview && labelSettings && (
         <>
           {/* On-screen preview modal */}
-          <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 z-50">
+          <div
+            className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 z-50"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="label-preview-title"
+            onClick={(e) => { if (e.target === e.currentTarget) setShowPrintPreview(false); }}
+          >
             <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-4xl max-h-[90vh] overflow-auto">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100">
+                <h3 id="label-preview-title" className="text-xl font-bold text-gray-900 dark:text-gray-100">
                   Label Preview
                 </h3>
                 <button
                   onClick={() => setShowPrintPreview(false)}
                   className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                  aria-label="Close preview"
                 >
                   ✕
                 </button>

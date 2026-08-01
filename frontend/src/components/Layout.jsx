@@ -16,7 +16,8 @@ import {
   FiChevronDown,
   FiPrinter,
   FiSun,
-  FiMoon
+  FiMoon,
+  FiKey
 } from 'react-icons/fi';
 import { useState, useEffect, useRef } from 'react';
 
@@ -59,9 +60,16 @@ export default function Layout() {
     return location.pathname.startsWith(path);
   };
 
+  // The Reader page renders its own full-screen shell over this layout.
+  // Rather than just visually covering the header (which still leaves it
+  // mounted and reachable by Tab/screen reader), omit it entirely while
+  // reading so keyboard/AT users land directly in the reader.
+  const isReaderRoute = /^\/items\/[^/]+\/read$/.test(location.pathname);
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       {/* Header */}
+      {!isReaderRoute && (
       <header className="bg-white dark:bg-gray-800 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
@@ -167,6 +175,17 @@ export default function Layout() {
                       >
                         <FiUsers className="w-4 h-4" />
                         User Management
+                      </Link>
+                    )}
+
+                    {isAdmin() && (
+                      <Link
+                        to="/api-settings"
+                        onClick={() => setProfileDropdownOpen(false)}
+                        className="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                      >
+                        <FiKey className="w-4 h-4" />
+                        API Settings
                       </Link>
                     )}
 
@@ -292,6 +311,22 @@ export default function Layout() {
                 </Link>
               )}
 
+              {/* API Settings (Admin only) */}
+              {isAdmin() && (
+                <Link
+                  to="/api-settings"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`flex items-center space-x-2 px-4 py-3 rounded-lg transition-colors ${
+                    isActive('/api-settings')
+                      ? 'bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400'
+                      : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                  }`}
+                >
+                  <FiKey className="w-5 h-5" />
+                  <span>API Settings</span>
+                </Link>
+              )}
+
               {/* Logout */}
               <button
                 onClick={() => {
@@ -307,9 +342,10 @@ export default function Layout() {
           </div>
         )}
       </header>
+      )}
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className={isReaderRoute ? '' : 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8'}>
         <Outlet />
       </main>
     </div>

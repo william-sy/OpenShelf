@@ -71,13 +71,7 @@ router.post('/users', async (req, res) => {
     const passwordHash = await bcrypt.hash(password, 10);
 
     // Create user
-    const newUser = User.create({
-      username,
-      email,
-      password_hash: passwordHash,
-      display_name: displayName || username,
-      role: userRole
-    });
+    const newUser = User.create(username, email, passwordHash, userRole, displayName || username);
 
     if (!newUser) {
       return res.status(500).json({ error: 'Failed to create user' });

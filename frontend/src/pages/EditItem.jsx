@@ -3,8 +3,11 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useItemStore } from '../store/itemStore';
 import { useCurrencyStore } from '../store/currencyStore';
 import toast from 'react-hot-toast';
-import { FiX } from 'react-icons/fi';
+import { FiX, FiImage } from 'react-icons/fi';
 import api from '../services/api';
+import { CREATOR_ROLES } from '../utils/tagSuggestions';
+import QuickTagSuggestions from '../components/QuickTagSuggestions';
+import { getImageUrl } from '../utils/imageUrl';
 
 export default function EditItem() {
   const { id } = useParams();
@@ -12,42 +15,51 @@ export default function EditItem() {
   const { getItemById, updateItem, fetchItems } = useItemStore();
   const { currencyCode } = useCurrencyStore();
   const [formData, setFormData] = useState(null);
+  const [originalData, setOriginalData] = useState(null);
   const [creatorInput, setCreatorInput] = useState({ name: '', role: 'author' });
   const [tagInput, setTagInput] = useState('');
   const [uploadingImage, setUploadingImage] = useState(false);
 
-  const creatorRoles = [
-    { value: 'author', label: 'Author' },
-    { value: 'writer', label: 'Writer' },
-    { value: 'illustrator', label: 'Illustrator' },
-    { value: 'artist', label: 'Artist' },
-    { value: 'singer', label: 'Singer' },
-    { value: 'songwriter', label: 'Songwriter' },
-    { value: 'composer', label: 'Composer' },
-    { value: 'director', label: 'Director' },
-    { value: 'actor', label: 'Actor' },
-    { value: 'band', label: 'Band' },
-    { value: 'other', label: 'Other' },
-  ];
+  const isDirty = formData && originalData && JSON.stringify(formData) !== JSON.stringify(originalData);
 
   useEffect(() => {
     fetchItems().then(() => {
       const item = getItemById(id);
       if (item) {
-        setFormData({
+        const initialData = {
           ...item,
           creators: item.creators || [],
           page_count: item.page_count || '',
           rating: item.rating || '',
           purchase_date: item.purchase_date || '',
           purchase_price: item.purchase_price || '',
-        });
+        };
+        setFormData(initialData);
+        setOriginalData(initialData);
       } else {
         toast.error('Item not found');
         navigate('/items');
       }
     });
   }, [id, getItemById, fetchItems, navigate]);
+
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      if (isDirty) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [isDirty]);
+
+  const handleCancel = () => {
+    if (isDirty && !window.confirm('You have unsaved changes. Discard them?')) {
+      return;
+    }
+    navigate(`/items/${id}`);
+  };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -195,7 +207,7 @@ export default function EditItem() {
                 onChange={(e) => setCreatorInput({ ...creatorInput, role: e.target.value })}
                 className="input w-40"
               >
-                {creatorRoles.map((role) => (
+                {CREATOR_ROLES.map((role) => (
                   <option key={role.value} value={role.value}>
                     {role.label}
                   </option>
@@ -262,7 +274,19 @@ export default function EditItem() {
 
           <div>
             <label className="label">Cover Image</label>
-            <div className="space-y-2">
+            <div className="flex gap-4">
+              <div className="w-20 h-28 flex-shrink-0 rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
+                {formData.cover_url ? (
+                  <img
+                    src={getImageUrl(formData.cover_url)}
+                    alt="Current cover"
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <FiImage className="w-8 h-8 text-gray-400 dark:text-gray-500" />
+                )}
+              </div>
+            <div className="space-y-2 flex-1">
               {formData.cover_url && (formData.cover_url.startsWith('/api/') || formData.cover_url.startsWith('/uploads/jellyfin_')) ? (
                 <input
                   type="text"
@@ -294,6 +318,7 @@ export default function EditItem() {
               {uploadingImage && (
                 <p className="text-sm text-gray-600 dark:text-gray-400">Uploading image...</p>
               )}
+            </div>
             </div>
           </div>
 
@@ -442,56 +467,10 @@ export default function EditItem() {
             <label className="label">Tags</label>
             
             {/* Quick Tag Suggestions */}
-            <div className="mb-3">
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Quick Add:</p>
-              <div className="flex flex-wrap gap-2">
-                {/* Language Tags */}
-                {['English', 'Dutch', 'French', 'German', 'Spanish', 'Italian', 'Japanese'].map(lang => (
-                  <button
-                    key={lang}
-                    type="button"
-                    onClick={() => {
-                      if (!(formData.tags || []).includes(lang)) {
-                        setFormData({ ...formData, tags: [...(formData.tags || []), lang] });
-                        toast.success(`Added ${lang} tag`);
-                      }
-                    }}
-                    className={`px-2 py-1 text-xs rounded-full transition-colors ${
-                      (formData.tags || []).includes(lang)
-                        ? 'bg-blue-500 text-white cursor-not-allowed'
-                        : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-blue-100 dark:hover:bg-blue-900'
-                    }`}
-                    disabled={(formData.tags || []).includes(lang)}
-                  >
-                    {lang} {(formData.tags || []).includes(lang) ? '✓' : null}
-                  </button>
-                ))}
-              </div>
-              
-              <div className="flex flex-wrap gap-2 mt-2">
-                {/* Genre/Category Tags */}
-                {['Fiction', 'Non-Fiction', 'Biography', 'Science Fiction', 'Fantasy', 'Mystery', 'Horror', 'Romance', 'Thriller', 'Comedy', 'Drama', 'Action'].map(genre => (
-                  <button
-                    key={genre}
-                    type="button"
-                    onClick={() => {
-                      if (!(formData.tags || []).includes(genre)) {
-                        setFormData({ ...formData, tags: [...(formData.tags || []), genre] });
-                        toast.success(`Added ${genre} tag`);
-                      }
-                    }}
-                    className={`px-2 py-1 text-xs rounded-full transition-colors ${
-                      (formData.tags || []).includes(genre)
-                        ? 'bg-green-500 text-white cursor-not-allowed'
-                        : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-green-100 dark:hover:bg-green-900'
-                    }`}
-                    disabled={(formData.tags || []).includes(genre)}
-                  >
-                    {genre} {(formData.tags || []).includes(genre) ? '✓' : null}
-                  </button>
-                ))}
-              </div>
-            </div>
+            <QuickTagSuggestions
+              tags={formData.tags || []}
+              onChange={(tags) => setFormData({ ...formData, tags })}
+            />
 
             {/* Custom Tag Input */}
             <div className="flex gap-2 mb-2">
@@ -552,7 +531,7 @@ export default function EditItem() {
           </button>
           <button
             type="button"
-            onClick={() => navigate(`/items/${id}`)}
+            onClick={handleCancel}
             className="btn btn-secondary"
           >
             Cancel

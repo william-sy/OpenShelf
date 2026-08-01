@@ -20,6 +20,7 @@ import ReadingStats from './pages/ReadingStats';
 import UserManagement from './pages/UserManagement';
 import Settings from './pages/Settings';
 import LabelSettings from './pages/LabelSettings';
+import ApiSettings from './pages/ApiSettings';
 
 // Components
 import Layout from './components/Layout';
@@ -79,6 +80,7 @@ function App() {
           <Route path="user-management" element={<UserManagement />} />
           <Route path="settings" element={<Settings />} />
           <Route path="label-settings" element={<LabelSettings />} />
+          <Route path="api-settings" element={<ApiSettings />} />
         </Route>
       </Routes>
     </BrowserRouter>

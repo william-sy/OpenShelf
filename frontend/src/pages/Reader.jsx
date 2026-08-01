@@ -19,16 +19,26 @@ export default function Reader() {
   const [showHeader, setShowHeader] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
-  // Fullscreen toggle function
+  // Fullscreen toggle function - only flip UI state once the browser
+  // actually confirms the transition; requestFullscreen() is rejected
+  // outright on some browsers (e.g. iOS Safari for non-video elements).
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen();
-      setIsFullscreen(true);
-      setShowHeader(false);
+      document.documentElement.requestFullscreen()
+        .then(() => {
+          setIsFullscreen(true);
+          setShowHeader(false);
+        })
+        .catch(() => {
+          toast.error('Fullscreen is not supported on this device/browser');
+        });
     } else {
-      document.exitFullscreen();
-      setIsFullscreen(false);
-      setShowHeader(true);
+      document.exitFullscreen()
+        .then(() => {
+          setIsFullscreen(false);
+          setShowHeader(true);
+        })
+        .catch(() => {});
     }
   };
 
@@ -141,7 +151,8 @@ export default function Reader() {
               <button
                 onClick={() => setShowHeader(false)}
                 className="btn btn-secondary flex items-center gap-2"
-                title="Hide header (hover top to show again)"
+                title="Hide header (hover or tap top to show again)"
+                aria-label="Hide header"
               >
                 <FiMinimize2 />
                 <span className="hidden sm:inline">Hide</span>
@@ -150,6 +161,7 @@ export default function Reader() {
                 onClick={toggleFullscreen}
                 className="btn btn-primary flex items-center gap-2"
                 title={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+                aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
               >
                 {isFullscreen ? <FiMinimize2 /> : <FiMaximize2 />}
                 <span className="hidden sm:inline">{isFullscreen ? 'Exit' : 'Fullscreen'}</span>
@@ -161,18 +173,21 @@ export default function Reader() {
 
       {/* Hover area to show header when hidden */}
       {!showHeader && (
-        <div
-          className="absolute top-0 left-0 right-0 h-4 z-40"
+        <button
+          type="button"
+          className="absolute top-0 left-0 right-0 h-6 z-40"
           onMouseEnter={() => setShowHeader(true)}
-          title="Hover to show header"
+          onClick={() => setShowHeader(true)}
+          aria-label="Show reader controls"
+          title="Hover or tap to show header"
         />
       )}
 
       {/* Reader Content */}
       <div className="flex-1 min-h-0">
-        {fileType === 'epub' && <EpubReader url={fileUrl} />}
-        {fileType === 'pdf' && <PdfReader url={fileUrl} />}
-        {fileType === 'comic' && <ComicReader url={fileUrl} />}
+        {fileType === 'epub' && <EpubReader url={fileUrl} itemId={id} />}
+        {fileType === 'pdf' && <PdfReader url={fileUrl} itemId={id} />}
+        {fileType === 'comic' && <ComicReader url={fileUrl} itemId={id} />}
       </div>
     </div>
   );

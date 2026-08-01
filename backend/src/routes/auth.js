@@ -141,7 +141,7 @@ router.post('/change-password',
 
     try {
       const { currentPassword, newPassword } = req.body;
-      const user = User.findById(req.user.id);
+      const user = User.findByIdWithPassword(req.user.id);
 
       // Verify current password
       const validPassword = await bcrypt.compare(currentPassword, user.password_hash);

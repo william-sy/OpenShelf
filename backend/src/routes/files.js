@@ -15,6 +15,17 @@ const __dirname = path.dirname(__filename);
 
 const router = express.Router();
 
+// Resolve `segments` inside `baseDir`, rejecting any path (via `..`, absolute
+// paths, encoded separators, etc.) that would escape it. Returns null if unsafe.
+function safeResolvePath(baseDir, ...segments) {
+  const resolvedBase = path.resolve(baseDir);
+  const resolvedTarget = path.resolve(resolvedBase, ...segments);
+  if (resolvedTarget !== resolvedBase && !resolvedTarget.startsWith(resolvedBase + path.sep)) {
+    return null;
+  }
+  return resolvedTarget;
+}
+
 // Configure multer for file uploads
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -68,35 +79,25 @@ const upload = multer({
 
 // Extract metadata from EPUB file
 async function extractEpubMetadata(filePath) {
-  return new Promise((resolve) => {
-    try {
-      const epub = new EPub(filePath);
-      
-      epub.on('end', () => {
-        resolve({
-          title: epub.metadata?.title || null,
-          author: epub.metadata?.creator || epub.metadata?.author || null,
-          publisher: epub.metadata?.publisher || null,
-          description: epub.metadata?.description || null,
-          language: epub.metadata?.language || null,
-          publishDate: epub.metadata?.date || null,
-          isbn: epub.metadata?.ISBN || null,
-          pageCount: epub.flow?.length || null,
-          format: 'EPUB'
-        });
-      });
-      
-      epub.on('error', (error) => {
-        console.error('EPUB metadata extraction failed:', error);
-        resolve({ format: 'EPUB', error: error.message });
-      });
-      
-      epub.parse();
-    } catch (error) {
-      console.error('EPUB metadata extraction failed:', error);
-      resolve({ format: 'EPUB', error: error.message });
-    }
-  });
+  try {
+    const epub = new EPub(filePath);
+    await epub.parse();
+
+    return {
+      title: epub.metadata?.title || null,
+      author: epub.metadata?.creator || null,
+      publisher: epub.metadata?.publisher || null,
+      description: epub.metadata?.description || null,
+      language: epub.metadata?.language || null,
+      publishDate: epub.metadata?.date || null,
+      isbn: epub.metadata?.ISBN || null,
+      pageCount: epub.flow?.length || null,
+      format: 'EPUB'
+    };
+  } catch (error) {
+    console.error('EPUB metadata extraction failed:', error);
+    return { format: 'EPUB', error: error.message };
+  }
 }
 
 // Extract metadata from PDF file
@@ -150,56 +151,28 @@ async function extractComicMetadata(filePath) {
 
 // Extract cover image from EPUB
 async function extractEpubCover(filePath) {
-  return new Promise((resolve) => {
-    try {
-      const epub = new EPub(filePath);
-      
-      epub.on('end', async () => {
-        try {
-          const coverId = epub.metadata?.cover;
-          
-          if (coverId) {
-            // Get the cover image
-            epub.getImage(coverId, async (error, img, mimeType) => {
-              if (error || !img) {
-                console.error('Failed to get EPUB cover:', error);
-                resolve(null);
-                return;
-              }
-              
-              try {
-                // Optimize the cover image
-                const optimizedBuffer = await sharp(img)
-                  .resize(500, 700, { fit: 'inside', withoutEnlargement: true })
-                  .jpeg({ quality: 85 })
-                  .toBuffer();
-                
-                resolve(optimizedBuffer);
-              } catch (sharpError) {
-                console.error('Failed to optimize EPUB cover:', sharpError);
-                resolve(null);
-              }
-            });
-          } else {
-            resolve(null);
-          }
-        } catch (error) {
-          console.error('EPUB cover extraction failed:', error);
-          resolve(null);
-        }
-      });
-      
-      epub.on('error', (error) => {
-        console.error('EPUB cover extraction failed:', error);
-        resolve(null);
-      });
-      
-      epub.parse();
-    } catch (error) {
-      console.error('EPUB cover extraction failed:', error);
-      resolve(null);
+  try {
+    const epub = new EPub(filePath);
+    await epub.parse();
+
+    const coverId = epub.metadata?.cover;
+    if (!coverId) {
+      return null;
     }
-  });
+
+    const { data: img } = await epub.getImage(coverId);
+    if (!img) {
+      return null;
+    }
+
+    return await sharp(img)
+      .resize(500, 700, { fit: 'inside', withoutEnlargement: true })
+      .jpeg({ quality: 85 })
+      .toBuffer();
+  } catch (error) {
+    console.error('EPUB cover extraction failed:', error);
+    return null;
+  }
 }
 
 // Extract cover image from comic archive (first image)
@@ -264,12 +237,17 @@ async function saveCoverImage(coverBuffer, originalFilename) {
 router.get('/covers/:filename', (req, res) => {
   try {
     const filename = req.params.filename;
-    const coverPath = path.join(__dirname, '../../uploads/covers', filename);
-    
+    const coversDir = path.join(__dirname, '../../uploads/covers');
+    const coverPath = safeResolvePath(coversDir, filename);
+
+    if (!coverPath) {
+      return res.status(400).json({ error: 'Invalid filename' });
+    }
+
     if (!fs.existsSync(coverPath)) {
       return res.status(404).json({ error: 'Cover image not found' });
     }
-    
+
     res.sendFile(coverPath);
   } catch (error) {
     console.error('Error serving cover image:', error);
@@ -281,8 +259,13 @@ router.get('/covers/:filename', (req, res) => {
 router.get('/:filename/images', authenticateToken, async (req, res) => {
   try {
     const filename = req.params.filename;
-    const filePath = path.join(__dirname, '../../uploads/ebooks', filename);
-    
+    const ebooksDir = path.join(__dirname, '../../uploads/ebooks');
+    const filePath = safeResolvePath(ebooksDir, filename);
+
+    if (!filePath) {
+      return res.status(400).json({ error: 'Invalid filename' });
+    }
+
     if (!fs.existsSync(filePath)) {
       return res.status(404).json({ error: 'Comic file not found' });
     }
@@ -330,12 +313,17 @@ router.get('/:filename/images', authenticateToken, async (req, res) => {
 router.get('/temp/:sessionId/:filename', (req, res) => {
   try {
     const { sessionId, filename } = req.params;
-    const imagePath = path.join(__dirname, '../../uploads/temp', sessionId, filename);
-    
+    const tempBaseDir = path.join(__dirname, '../../uploads/temp');
+    const imagePath = safeResolvePath(tempBaseDir, sessionId, filename);
+
+    if (!imagePath) {
+      return res.status(400).json({ error: 'Invalid path' });
+    }
+
     if (!fs.existsSync(imagePath)) {
       return res.status(404).json({ error: 'Image not found' });
     }
-    
+
     res.sendFile(imagePath);
   } catch (error) {
     console.error('Error serving comic page:', error);

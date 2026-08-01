@@ -4,7 +4,11 @@ import axios from 'axios';
 import { FiAlertCircle } from 'react-icons/fi';
 import 'react-image-gallery/styles/css/image-gallery.css';
 
-export default function ComicReader({ url }) {
+function storageKey(itemId) {
+  return `openshelf-comic-page-${itemId}`;
+}
+
+export default function ComicReader({ url, itemId }) {
   const [images, setImages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -70,6 +74,12 @@ export default function ComicReader({ url }) {
       <div className="w-full max-w-5xl">
         <ImageGallery
           items={images}
+          startIndex={itemId ? Math.min(parseInt(localStorage.getItem(storageKey(itemId)), 10) || 0, images.length - 1) : 0}
+          onSlide={(currentIndex) => {
+            if (itemId) {
+              localStorage.setItem(storageKey(itemId), String(currentIndex));
+            }
+          }}
           showPlayButton={false}
           showFullscreenButton={true}
           showNav={true}

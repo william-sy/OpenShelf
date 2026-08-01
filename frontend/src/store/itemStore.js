@@ -1,16 +1,24 @@
 import { create } from 'zustand';
 import api from '../services/api';
 
+const PAGE_SIZE = 60;
+
 export const useItemStore = create((set, get) => ({
   items: [], // Filtered items for current view
   allItems: [], // Complete collection (always unfiltered)
   loading: false,
   error: null,
+  allItemsLoading: false,
+  allItemsError: null,
+  hasMore: false,
+  loadingMore: false,
   filter: {
     type: '',
     search: '',
     wishlist: null, // null = all, true = wishlist only, false = owned only
     favorite: null, // null = all, true = favorites only
+    sortBy: 'created_at',
+    sortOrder: 'desc',
   },
 
   setFilter: (filter) => {
@@ -21,12 +29,14 @@ export const useItemStore = create((set, get) => ({
 
   // Fetch all items without filters (for dashboard stats)
   fetchAllItems: async () => {
+    set({ allItemsLoading: true, allItemsError: null });
     try {
       const response = await api.get('/api/items');
-      set({ allItems: response.data });
+      set({ allItems: response.data, allItemsLoading: false });
       return response.data;
     } catch (error) {
       console.error('Failed to fetch all items:', error);
+      set({ allItemsLoading: false, allItemsError: error.message || 'Failed to load items' });
       return [];
     }
   },
@@ -34,22 +44,56 @@ export const useItemStore = create((set, get) => ({
   fetchItems: async () => {
     set({ loading: true, error: null });
     try {
-      const { type, search, wishlist, favorite } = get().filter;
+      const { type, search, wishlist, favorite, sortBy, sortOrder } = get().filter;
       const params = new URLSearchParams();
       if (type) params.append('type', type);
       if (search) params.append('search', search);
       if (wishlist !== null) params.append('wishlist', wishlist);
       if (favorite !== null) params.append('favorite', favorite);
-      
+      if (sortBy) params.append('sortBy', sortBy);
+      if (sortOrder) params.append('sortOrder', sortOrder);
+      params.append('limit', PAGE_SIZE);
+      params.append('offset', 0);
+
       const response = await api.get(`/api/items?${params.toString()}`);
-      set({ items: response.data, loading: false });
-      
+      set({
+        items: response.data,
+        loading: false,
+        hasMore: response.data.length === PAGE_SIZE,
+      });
+
       // Also update allItems if no filters are applied
       if (!type && !search && wishlist === null && favorite === null) {
         set({ allItems: response.data });
       }
     } catch (error) {
       set({ error: error.message, loading: false });
+    }
+  },
+
+  fetchMoreItems: async () => {
+    if (get().loadingMore || !get().hasMore) return;
+    set({ loadingMore: true });
+    try {
+      const { type, search, wishlist, favorite, sortBy, sortOrder } = get().filter;
+      const params = new URLSearchParams();
+      if (type) params.append('type', type);
+      if (search) params.append('search', search);
+      if (wishlist !== null) params.append('wishlist', wishlist);
+      if (favorite !== null) params.append('favorite', favorite);
+      if (sortBy) params.append('sortBy', sortBy);
+      if (sortOrder) params.append('sortOrder', sortOrder);
+      params.append('limit', PAGE_SIZE);
+      params.append('offset', get().items.length);
+
+      const response = await api.get(`/api/items?${params.toString()}`);
+      set({
+        items: [...get().items, ...response.data],
+        loadingMore: false,
+        hasMore: response.data.length === PAGE_SIZE,
+      });
+    } catch (error) {
+      set({ loadingMore: false });
     }
   },
 

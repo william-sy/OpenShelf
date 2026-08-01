@@ -14,6 +14,10 @@ export const User = {
     return db.prepare('SELECT id, username, email, display_name, role, currency, created_at FROM users WHERE id = ?').get(id);
   },
 
+  findByIdWithPassword(id) {
+    return db.prepare('SELECT * FROM users WHERE id = ?').get(id);
+  },
+
   findByUsername(username) {
     return db.prepare('SELECT * FROM users WHERE username = ?').get(username);
   },

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../services/api';
 import toast from 'react-hot-toast';
-import { FiBook, FiBookOpen, FiClock, FiCheckCircle, FiTrendingUp, FiCalendar } from 'react-icons/fi';
+import { FiBook, FiBookOpen, FiClock, FiCheckCircle, FiTrendingUp, FiAlertCircle } from 'react-icons/fi';
 import {
   BarChart,
   Bar,
@@ -18,43 +18,75 @@ import {
   Pie,
   Cell
 } from 'recharts';
+import { useThemeStore } from '../store/themeStore';
+import { getImageUrl } from '../utils/imageUrl';
 
-const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
+// The app's own primary token, used consistently for single-series charts
+// instead of an arbitrary hex pulled from nowhere.
+const PRIMARY_CHART_COLOR = '#0284c7';
 
 export default function ReadingStats() {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const { isDark } = useThemeStore();
 
   useEffect(() => {
     fetchStats();
   }, []);
 
   const fetchStats = async () => {
+    setLoading(true);
+    setError(null);
     try {
       const response = await api.get('/api/reading-status/stats/overview');
       setStats(response.data);
-    } catch (error) {
-      console.error('Error fetching reading stats:', error);
-      toast.error('Failed to load reading statistics');
+    } catch (err) {
+      console.error('Error fetching reading stats:', err);
+      const message = err.response?.data?.error || 'Failed to load reading statistics';
+      setError(message);
+      toast.error(message);
     } finally {
       setLoading(false);
     }
+  };
+
+  const chartTheme = {
+    grid: isDark ? '#374151' : '#e5e7eb',
+    axis: isDark ? '#9ca3af' : '#6b7280',
+    tooltipBg: isDark ? '#1f2937' : '#ffffff',
+    tooltipBorder: isDark ? '#374151' : '#e5e7eb',
+    tooltipText: isDark ? '#f3f4f6' : '#111827',
+  };
+  const tooltipStyle = {
+    backgroundColor: chartTheme.tooltipBg,
+    border: `1px solid ${chartTheme.tooltipBorder}`,
+    borderRadius: '0.5rem',
+    color: chartTheme.tooltipText,
   };
 
   if (loading) {
     return (
       <div className="text-center py-12">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
+        <p className="text-gray-600 dark:text-gray-400 mt-4">Loading statistics...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="text-center py-12">
+        <FiAlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+        <p className="text-gray-900 dark:text-gray-100 font-medium mb-1">Couldn't load reading statistics</p>
+        <p className="text-gray-600 dark:text-gray-400 mb-4">{error}</p>
+        <button onClick={fetchStats} className="btn btn-primary">Try again</button>
       </div>
     );
   }
 
   if (!stats) {
-    return (
-      <div className="text-center py-12">
-        <p className="text-gray-600 dark:text-gray-400">Failed to load statistics</p>
-      </div>
-    );
+    return null;
   }
 
   // Format books per month data for chart
@@ -135,7 +167,7 @@ export default function ReadingStats() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-600 dark:text-gray-400">Reading Velocity</p>
-              <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">
+              <p className="text-2xl font-bold text-primary-600 dark:text-primary-400">
                 {stats.readingVelocity.avgPagesPerDay > 0
                   ? Math.round(stats.readingVelocity.avgPagesPerDay)
                   : '—'}
@@ -144,7 +176,7 @@ export default function ReadingStats() {
                 pages/day average
               </p>
             </div>
-            <FiTrendingUp className="w-8 h-8 text-purple-500" />
+            <FiTrendingUp className="w-8 h-8 text-primary-500" />
           </div>
         </div>
       </div>
@@ -159,11 +191,11 @@ export default function ReadingStats() {
             </h2>
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={booksPerMonthData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="month" />
-                <YAxis />
-                <Tooltip />
-                <Bar dataKey="books" fill="#10b981" />
+                <CartesianGrid strokeDasharray="3 3" stroke={chartTheme.grid} />
+                <XAxis dataKey="month" stroke={chartTheme.axis} />
+                <YAxis stroke={chartTheme.axis} allowDecimals={false} />
+                <Tooltip contentStyle={tooltipStyle} />
+                <Bar dataKey="books" fill={PRIMARY_CHART_COLOR} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -184,14 +216,13 @@ export default function ReadingStats() {
                   labelLine={false}
                   label={({ name, value }) => `${name}: ${value}`}
                   outerRadius={100}
-                  fill="#8884d8"
                   dataKey="value"
                 >
                   {statusData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
                 </Pie>
-                <Tooltip />
+                <Tooltip contentStyle={tooltipStyle} />
               </PieChart>
             </ResponsiveContainer>
           </div>
@@ -206,12 +237,12 @@ export default function ReadingStats() {
           </h2>
           <ResponsiveContainer width="100%" height={300}>
             <LineChart data={pagesPerWeekData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="week" />
-              <YAxis />
-              <Tooltip />
+              <CartesianGrid strokeDasharray="3 3" stroke={chartTheme.grid} />
+              <XAxis dataKey="week" stroke={chartTheme.axis} />
+              <YAxis stroke={chartTheme.axis} allowDecimals={false} />
+              <Tooltip contentStyle={tooltipStyle} />
               <Legend />
-              <Line type="monotone" dataKey="pages" stroke="#3b82f6" strokeWidth={2} />
+              <Line type="monotone" dataKey="pages" stroke={PRIMARY_CHART_COLOR} strokeWidth={2} />
             </LineChart>
           </ResponsiveContainer>
         </div>
@@ -261,7 +292,7 @@ export default function ReadingStats() {
               >
                 {activity.cover_url ? (
                   <img
-                    src={activity.cover_url}
+                    src={getImageUrl(activity.cover_url)}
                     alt={activity.title}
                     className="w-12 h-16 object-cover rounded"
                   />

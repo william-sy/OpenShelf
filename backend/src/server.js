@@ -1,7 +1,6 @@
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
-import dotenv from 'dotenv';
 import rateLimit from 'express-rate-limit';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -23,9 +22,6 @@ import filesRoutes from './routes/files.js';
 // Import migrations
 import { runMigrations } from './config/migrations.js';
 
-// Load environment variables
-dotenv.config();
-
 // Run database migrations on startup
 try {
   runMigrations();
@@ -46,9 +42,13 @@ app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" }
 }));
 
-// CORS configuration - allow requests from any origin in development
+// CORS configuration - reflect the request origin instead of using '*'.
+// '*' combined with credentials:true is invalid per the CORS spec and
+// browsers reject it outright; set CORS_ORIGIN (comma-separated) to lock
+// this down to specific origins in production.
+const corsOrigin = process.env.CORS_ORIGIN;
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || '*',
+  origin: corsOrigin ? corsOrigin.split(',').map(o => o.trim()) : true,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
@@ -65,6 +65,18 @@ const limiter = rateLimit({
   skip: (req) => req.path === '/health'
 });
 app.use('/api/', limiter);
+
+// Stricter rate limiting on credential-guessing surfaces
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: 'Too many attempts, please try again later.',
+  skipSuccessfulRequests: true
+});
+app.use('/api/auth/login', authLimiter);
+app.use('/api/auth/change-password', authLimiter);
 
 // Body parsing middleware
 app.use(express.json());

@@ -65,6 +65,8 @@ export default function Register() {
     });
   };
 
+  const passwordsMismatch = formData.confirmPassword.length > 0 && formData.password !== formData.confirmPassword;
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary-50 to-primary-100 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center px-4">
       <div className="max-w-md w-full">
@@ -73,13 +75,13 @@ export default function Register() {
           <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-primary-500 to-primary-700 rounded-2xl mb-4">
             <FiBook className="w-8 h-8 text-white" />
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 dark:text-gray-100">OpenShelf</h1>
-          <p className="text-gray-600 dark:text-gray-400 dark:text-gray-400 mt-2">Create your account</p>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">OpenShelf</h1>
+          <p className="text-gray-600 dark:text-gray-400 mt-2">Create your account</p>
         </div>
 
         {/* Register Form */}
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8">
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 dark:text-gray-100 mb-6">Sign Up</h2>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6">Sign Up</h2>
           
           {checkingStatus ? (
             <div className="text-center py-8">
@@ -107,16 +109,19 @@ export default function Register() {
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="label">Username</label>
+              <label htmlFor="register-username" className="label">Username</label>
               <div className="relative">
-                <FiUser className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500" />
+                <FiUser className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500" aria-hidden="true" />
                 <input
+                  id="register-username"
                   type="text"
                   name="username"
                   value={formData.username}
                   onChange={handleChange}
                   className="input pl-10"
                   placeholder="Choose a username"
+                  autoComplete="username"
+                  autoCapitalize="none"
                   required
                   minLength={3}
                   autoFocus
@@ -125,47 +130,53 @@ export default function Register() {
             </div>
 
             <div>
-              <label className="label">Display Name (Optional)</label>
+              <label htmlFor="register-display-name" className="label">Display Name (Optional)</label>
               <div className="relative">
-                <FiUser className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500" />
+                <FiUser className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500" aria-hidden="true" />
                 <input
+                  id="register-display-name"
                   type="text"
                   name="displayName"
                   value={formData.displayName}
                   onChange={handleChange}
                   className="input pl-10"
                   placeholder="How you want to be called"
+                  autoComplete="nickname"
                 />
               </div>
             </div>
 
             <div>
-              <label className="label">Email</label>
+              <label htmlFor="register-email" className="label">Email</label>
               <div className="relative">
-                <FiMail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500" />
+                <FiMail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500" aria-hidden="true" />
                 <input
+                  id="register-email"
                   type="email"
                   name="email"
                   value={formData.email}
                   onChange={handleChange}
                   className="input pl-10"
                   placeholder="your@email.com"
+                  autoComplete="email"
                   required
                 />
               </div>
             </div>
 
             <div>
-              <label className="label">Password</label>
+              <label htmlFor="register-password" className="label">Password</label>
               <div className="relative">
-                <FiLock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500" />
+                <FiLock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500" aria-hidden="true" />
                 <input
+                  id="register-password"
                   type="password"
                   name="password"
                   value={formData.password}
                   onChange={handleChange}
                   className="input pl-10"
                   placeholder="At least 6 characters"
+                  autoComplete="new-password"
                   required
                   minLength={6}
                 />
@@ -173,25 +184,35 @@ export default function Register() {
             </div>
 
             <div>
-              <label className="label">Confirm Password</label>
+              <label htmlFor="register-confirm-password" className="label">Confirm Password</label>
               <div className="relative">
-                <FiLock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                <FiLock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500" aria-hidden="true" />
                 <input
+                  id="register-confirm-password"
                   type="password"
                   name="confirmPassword"
                   value={formData.confirmPassword}
                   onChange={handleChange}
-                  className="input pl-10"
+                  className={`input pl-10 ${passwordsMismatch ? 'border-red-500 dark:border-red-500 focus:ring-red-500' : ''}`}
                   placeholder="Confirm your password"
+                  autoComplete="new-password"
                   required
                   minLength={6}
+                  aria-invalid={passwordsMismatch}
+                  aria-describedby={passwordsMismatch ? 'confirm-password-error' : undefined}
                 />
               </div>
+              {passwordsMismatch && (
+                <p id="confirm-password-error" className="mt-1 text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
+                  <FiAlertCircle className="w-4 h-4 flex-shrink-0" />
+                  Passwords do not match
+                </p>
+              )}
             </div>
 
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || passwordsMismatch}
               className="w-full btn btn-primary disabled:opacity-50"
             >
               {loading ? 'Creating account...' : 'Create Account'}
@@ -200,7 +221,7 @@ export default function Register() {
           )}
 
           <div className="mt-6 text-center">
-            <p className="text-sm text-gray-600 dark:text-gray-400 dark:text-gray-400">
+            <p className="text-sm text-gray-600 dark:text-gray-400">
               Already have an account?{' '}
               <Link to="/login" className="text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300 font-medium">
                 Sign in

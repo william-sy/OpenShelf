@@ -5,20 +5,13 @@ import { useItemStore } from '../store/itemStore';
 import { useAuthStore } from '../store/authStore';
 import { FiBook, FiSearch, FiFilter, FiPlus, FiImage, FiHeart, FiDownload, FiUpload, FiLock, FiStar, FiPrinter, FiCheckSquare, FiSquare, FiBookOpen } from 'react-icons/fi';
 import toast from 'react-hot-toast';
-import api, { API_URL } from '../services/api';
+import api from '../services/api';
 import ItemLabel from '../components/ItemLabel';
-
-// Helper to convert relative API URLs to absolute URLs
-const getImageUrl = (url) => {
-  if (!url) return null;
-  if (url.startsWith('http://') || url.startsWith('https://')) return url;
-  if (url.startsWith('/api/')) return `${API_URL}${url}`;
-  if (url.startsWith('/')) return `${API_URL}${url}`;
-  return url;
-};
+import { getImageUrl } from '../utils/imageUrl';
+import { MEDIA_TYPE_ORDER, getMediaTypeMeta } from '../utils/mediaType';
 
 export default function ItemList() {
-  const { items, loading, filter, setFilter, fetchItems } = useItemStore();
+  const { items, allItems, loading, hasMore, loadingMore, filter, setFilter, fetchItems, fetchAllItems, fetchMoreItems, updateItem } = useItemStore();
   const { isAdmin, canModifyItems } = useAuthStore();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -31,6 +24,8 @@ export default function ItemList() {
   const [showMultiPrintModal, setShowMultiPrintModal] = useState(false);
   const [labelSettings, setLabelSettings] = useState(null);
   const [combineLabels, setCombineLabels] = useState(false);
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const exportMenuRef = useRef(null);
 
   // Sync filter from URL params when URL changes
   useEffect(() => {
@@ -46,17 +41,37 @@ export default function ItemList() {
     fetchItems();
   }, [filter, fetchItems]);
 
+  // Unfiltered counts for the type dropdown, independent of the active filter
+  useEffect(() => {
+    fetchAllItems();
+  }, [fetchAllItems]);
+
   // Close modal on Escape key
   useEffect(() => {
     const handleEscape = (e) => {
       if (e.key === 'Escape' && showMultiPrintModal) {
         setShowMultiPrintModal(false);
       }
+      if (e.key === 'Escape' && showExportMenu) {
+        setShowExportMenu(false);
+      }
     };
 
     document.addEventListener('keydown', handleEscape);
     return () => document.removeEventListener('keydown', handleEscape);
-  }, [showMultiPrintModal]);
+  }, [showMultiPrintModal, showExportMenu]);
+
+  // Close export menu on outside click
+  useEffect(() => {
+    if (!showExportMenu) return;
+    const handleClickOutside = (e) => {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(e.target)) {
+        setShowExportMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showExportMenu]);
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -178,18 +193,16 @@ export default function ItemList() {
   const toggleFavorite = async (e, itemId) => {
     e.preventDefault();
     e.stopPropagation();
-    
+
     try {
       const item = items.find(i => i.id === itemId);
       const newFavoriteStatus = !item.favorite;
-      
-      await api.put(`/api/items/${itemId}`, {
-        ...item,
-        favorite: newFavoriteStatus
-      });
-      
+
+      // Optimistic, targeted update - avoids refetching (and full-page
+      // loading-spinner flash) for a one-field change.
+      await updateItem(itemId, { ...item, favorite: newFavoriteStatus });
+
       toast.success(newFavoriteStatus ? 'Added to favorites' : 'Removed from favorites');
-      fetchItems(); // Refresh the list
     } catch (error) {
       toast.error('Failed to update favorite status');
     }
@@ -201,17 +214,10 @@ export default function ItemList() {
     navigate(`/items/${itemId}/read`);
   };
 
-  const types = [
-    { value: '', label: 'All' },
-    { value: 'book', label: 'Books' },
-    { value: 'comic', label: 'Comics' },
-    { value: 'cd', label: 'CDs' },
-    { value: 'vinyl', label: 'Vinyl' },
-    { value: 'dvd', label: 'DVDs' },
-    { value: 'bluray', label: 'Blu-ray' },
-    { value: 'ebook', label: 'Ebooks' },
-    { value: 'other', label: 'Other' },
-  ];
+  const typeCounts = MEDIA_TYPE_ORDER.reduce((acc, type) => {
+    acc[type] = allItems.filter((i) => i.type === type).length;
+    return acc;
+  }, {});
 
   return (
     <div className="space-y-6">
@@ -246,25 +252,32 @@ export default function ItemList() {
             {selectedItems.length === items.length ? <FiCheckSquare /> : <FiSquare />}
             {selectedItems.length === items.length ? 'Deselect All' : 'Select All'}
           </button>
-          <div className="relative group">
-            <button className="btn btn-secondary flex items-center gap-2">
+          <div className="relative" ref={exportMenuRef}>
+            <button
+              onClick={() => setShowExportMenu((v) => !v)}
+              className="btn btn-secondary flex items-center gap-2"
+              aria-haspopup="true"
+              aria-expanded={showExportMenu}
+            >
               <FiDownload />
               Export
             </button>
-            <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10">
-              <button
-                onClick={() => handleExport('json')}
-                className="w-full text-left px-4 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-t-lg text-gray-900 dark:text-gray-100"
-              >
-                Export as JSON
-              </button>
-              <button
-                onClick={() => handleExport('csv')}
-                className="w-full text-left px-4 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-b-lg text-gray-900 dark:text-gray-100"
-              >
-                Export as CSV
-              </button>
-            </div>
+            {showExportMenu && (
+              <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-10">
+                <button
+                  onClick={() => { handleExport('json'); setShowExportMenu(false); }}
+                  className="w-full text-left px-4 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-t-lg text-gray-900 dark:text-gray-100"
+                >
+                  Export as JSON
+                </button>
+                <button
+                  onClick={() => { handleExport('csv'); setShowExportMenu(false); }}
+                  className="w-full text-left px-4 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-b-lg text-gray-900 dark:text-gray-100"
+                >
+                  Export as CSV
+                </button>
+              </div>
+            )}
           </div>
           {canModifyItems() && (
             <>
@@ -305,9 +318,10 @@ export default function ItemList() {
         </div>
 
         {/* Quick Filters */}
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={() => handleFavoriteFilter(true)}
+            aria-pressed={filter.favorite === true}
             className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
               filter.favorite === true
                 ? 'bg-red-600 text-white'
@@ -319,6 +333,7 @@ export default function ItemList() {
           </button>
           <button
             onClick={() => handleWishlistFilter(true)}
+            aria-pressed={filter.wishlist === true}
             className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
               filter.wishlist === true
                 ? 'bg-pink-600 text-white'
@@ -330,6 +345,7 @@ export default function ItemList() {
           </button>
           <button
             onClick={() => handleWishlistFilter(false)}
+            aria-pressed={filter.wishlist === false}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
               filter.wishlist === false
                 ? 'bg-primary-600 text-white'
@@ -338,24 +354,44 @@ export default function ItemList() {
           >
             Owned Only
           </button>
-        </div>
 
-        {/* Type Filter */}
-        <div className="flex flex-wrap items-center gap-2">
-          <FiFilter className="text-gray-400" />
-          {types.map((type) => (
-            <button
-              key={type.value}
-              onClick={() => handleTypeFilter(type.value)}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                filter.type === type.value
-                  ? 'bg-primary-600 text-white'
-                  : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-              }`}
+          {/* Type Filter - a dropdown rather than a wall of 9 chips, which
+              blew well past the ≤4 working-memory guideline */}
+          <div className="relative inline-flex items-center">
+            <FiFilter className="absolute left-3 text-gray-400 pointer-events-none w-4 h-4" />
+            <select
+              value={filter.type}
+              onChange={(e) => handleTypeFilter(e.target.value)}
+              aria-label="Filter by format"
+              className="input pl-9 pr-8 py-2 w-auto text-sm font-medium"
             >
-              {type.label}
-            </button>
-          ))}
+              <option value="">All formats ({allItems.length})</option>
+              {MEDIA_TYPE_ORDER.map((type) => (
+                <option key={type} value={type}>
+                  {getMediaTypeMeta(type).label} ({typeCounts[type]})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Sort */}
+          <div className="relative inline-flex items-center">
+            <select
+              value={`${filter.sortBy}:${filter.sortOrder}`}
+              onChange={(e) => {
+                const [sortBy, sortOrder] = e.target.value.split(':');
+                setFilter({ sortBy, sortOrder });
+              }}
+              aria-label="Sort library"
+              className="input pr-8 py-2 w-auto text-sm font-medium"
+            >
+              <option value="created_at:desc">Recently Added</option>
+              <option value="created_at:asc">Oldest Added</option>
+              <option value="title:asc">Title (A-Z)</option>
+              <option value="title:desc">Title (Z-A)</option>
+              <option value="rating:desc">Highest Rated</option>
+            </select>
+          </div>
         </div>
       </div>
 
@@ -385,7 +421,9 @@ export default function ItemList() {
         </div>
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-          {items.map((item) => (
+          {items.map((item) => {
+            const meta = getMediaTypeMeta(item.type);
+            return (
             <div key={item.id} className="card hover:shadow-lg transition-shadow p-4 relative">
               <Link to={`/items/${item.id}`} className="block">
                 {item.cover_url ? (
@@ -420,8 +458,8 @@ export default function ItemList() {
                 </div>
               )}
               <div className="flex flex-wrap gap-1 pb-12">
-                <span className="inline-block px-2 py-1 bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400 text-xs rounded">
-                  {item.type}
+                <span className={`inline-block px-2 py-1 text-xs rounded ${meta.chip}`}>
+                  {meta.label}
                 </span>
                 {item.tags?.map((tag, index) => (
                   <button
@@ -447,30 +485,36 @@ export default function ItemList() {
               <div className="absolute bottom-2 right-2 z-10 flex gap-2">
                 {/* Read Ebook Button - Only for ebooks with files */}
                 {item.type === 'ebook' && item.file_path && (
-                  <div 
+                  <button
+                    type="button"
                     onClick={(e) => handleOpenReader(e, item.id)}
                     className="bg-white dark:bg-gray-800 rounded-full p-2 shadow-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                     title="Open reader"
+                    aria-label="Open reader"
                   >
                     <FiBookOpen className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                  </div>
+                  </button>
                 )}
 
                 {/* Favorite Button */}
-                <div 
+                <button
+                  type="button"
                   onClick={(e) => toggleFavorite(e, item.id)}
                   className="bg-white dark:bg-gray-800 rounded-full p-2 shadow-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                   title={item.favorite ? 'Remove from favorites' : 'Add to favorites'}
+                  aria-label={item.favorite ? 'Remove from favorites' : 'Add to favorites'}
+                  aria-pressed={Boolean(item.favorite)}
                 >
                   <FiHeart className={`w-4 h-4 ${
-                    item.favorite 
-                      ? 'text-red-600 dark:text-red-400 fill-current' 
+                    item.favorite
+                      ? 'text-red-600 dark:text-red-400 fill-current'
                       : 'text-gray-400'
                   }`} />
-                </div>
+                </button>
 
                 {/* Print Selection Button */}
-                <div 
+                <button
+                  type="button"
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
@@ -478,16 +522,31 @@ export default function ItemList() {
                   }}
                   className="bg-white dark:bg-gray-800 rounded-full p-2 shadow-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                   title={selectedItems.includes(item.id) ? 'Deselect for printing' : 'Select for printing'}
+                  aria-label={selectedItems.includes(item.id) ? 'Deselect for printing' : 'Select for printing'}
+                  aria-pressed={selectedItems.includes(item.id)}
                 >
                   <FiPrinter className={`w-4 h-4 ${
-                    selectedItems.includes(item.id) 
-                      ? 'text-primary-600 dark:text-primary-400' 
+                    selectedItems.includes(item.id)
+                      ? 'text-primary-600 dark:text-primary-400'
                       : 'text-gray-400'
                   }`} />
-                </div>
+                </button>
               </div>
             </div>
-          ))}
+            );
+          })}
+        </div>
+      )}
+
+      {!loading && hasMore && (
+        <div className="text-center">
+          <button
+            onClick={() => fetchMoreItems()}
+            disabled={loadingMore}
+            className="btn btn-secondary disabled:opacity-50"
+          >
+            {loadingMore ? 'Loading...' : 'Load More'}
+          </button>
         </div>
       )}
 

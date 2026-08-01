@@ -34,8 +34,8 @@ router.get('/registration-status', async (req, res) => {
 // All other routes require authentication
 router.use(authenticateToken);
 
-// Get API settings (all users can view, but shared across all users)
-router.get('/apis', async (req, res) => {
+// Get API settings (admin only - contains plaintext third-party API keys)
+router.get('/apis', requireAdmin, async (req, res) => {
   try {
     // In shared library model, we use user_id = 1 (first admin) for system-wide settings
     const adminUser = req.user.role === 'admin' ? req.user.id : 1;

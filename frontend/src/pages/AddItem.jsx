@@ -5,16 +5,11 @@ import { useCurrencyStore } from '../store/currencyStore';
 import toast from 'react-hot-toast';
 import { FiSearch, FiCamera, FiX } from 'react-icons/fi';
 import ISBNScanner from '../components/ISBNScanner';
-import api, { API_URL } from '../services/api';
-
-// Helper to convert relative API URLs to absolute URLs
-const getImageUrl = (url) => {
-  if (!url) return null;
-  if (url.startsWith('http://') || url.startsWith('https://')) return url;
-  if (url.startsWith('/api/')) return `${API_URL}${url}`;
-  if (url.startsWith('/')) return `${API_URL}${url}`;
-  return url;
-};
+import api from '../services/api';
+import { getImageUrl } from '../utils/imageUrl';
+import { CREATOR_ROLES } from '../utils/tagSuggestions';
+import { MEDIA_TYPE_ORDER, getMediaTypeMeta } from '../utils/mediaType';
+import QuickTagSuggestions from '../components/QuickTagSuggestions';
 
 export default function AddItem() {
   const navigate = useNavigate();
@@ -25,9 +20,11 @@ export default function AddItem() {
   
   // Check if we're duplicating an item
   const duplicateFrom = location.state?.duplicateFrom;
-  
-  const [formData, setFormData] = useState(duplicateFrom || {
-    type: 'book',
+
+  // Factored out so "Save & Add Another" can reset the form for the next
+  // item in a batch-scanning session without losing the chosen type.
+  const emptyFormData = (type = 'book') => ({
+    type,
     title: '',
     subtitle: '',
     creators: [],
@@ -54,7 +51,10 @@ export default function AddItem() {
     comicvine_id: '',
     wishlist: false,
   });
-  
+
+  const [formData, setFormData] = useState(duplicateFrom || emptyFormData());
+  const [submitting, setSubmitting] = useState(false);
+
   // Show toast if duplicating
   useEffect(() => {
     if (duplicateFrom) {
@@ -80,20 +80,6 @@ export default function AddItem() {
   const [uploadingFile, setUploadingFile] = useState(false);
   const [uploadedFileName, setUploadedFileName] = useState('');
   const [extractedMetadata, setExtractedMetadata] = useState(null);
-
-  const creatorRoles = [
-    { value: 'author', label: 'Author' },
-    { value: 'writer', label: 'Writer' },
-    { value: 'illustrator', label: 'Illustrator' },
-    { value: 'artist', label: 'Artist' },
-    { value: 'singer', label: 'Singer' },
-    { value: 'songwriter', label: 'Songwriter' },
-    { value: 'composer', label: 'Composer' },
-    { value: 'director', label: 'Director' },
-    { value: 'actor', label: 'Actor' },
-    { value: 'band', label: 'Band' },
-    { value: 'other', label: 'Other' },
-  ];
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -574,9 +560,19 @@ export default function AddItem() {
     });
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e, andAddAnother = false) => {
     e.preventDefault();
+    if (submitting) return;
 
+    // The "Save & Add Another" button is type="button" so it doesn't trigger
+    // native HTML5 required-field validation the way the submit button does -
+    // check explicitly so both paths behave the same.
+    if (!formData.title || !formData.title.trim()) {
+      toast.error('Title is required');
+      return;
+    }
+
+    setSubmitting(true);
     try {
       const itemData = {
         ...formData,
@@ -586,10 +582,24 @@ export default function AddItem() {
       };
 
       await addItem(itemData);
-      toast.success('Item added successfully!');
-      navigate('/items');
+
+      if (andAddAnother) {
+        toast.success('Item added! Ready for the next one.');
+        // Keep the type (batch-scanning a shelf is usually one format at a
+        // time) but clear everything else, including lookup/search state.
+        setFormData(emptyFormData(formData.type));
+        setUploadedFileName('');
+        setExtractedMetadata(null);
+        setSearchQuery('');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      } else {
+        toast.success('Item added successfully!');
+        navigate('/items');
+      }
     } catch (error) {
       toast.error(error.response?.data?.error || 'Failed to add item');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -604,19 +614,21 @@ export default function AddItem() {
         {/* Type Selection */}
         <div className="card">
           <label className="label">Item Type *</label>
-          <div className="flex flex-wrap gap-2">
-            {['book', 'comic', 'cd', 'vinyl', 'dvd', 'bluray', 'ebook', 'other'].map((type) => (
+          <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Item type">
+            {MEDIA_TYPE_ORDER.map((type) => (
               <button
                 key={type}
                 type="button"
                 onClick={() => setFormData({ ...formData, type })}
-                className={`px-4 py-2 rounded-lg text-sm font-medium capitalize transition-colors ${
+                role="radio"
+                aria-checked={formData.type === type}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                   formData.type === type
                     ? 'bg-primary-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
                 }`}
               >
-                {type}
+                {getMediaTypeMeta(type).label}
               </button>
             ))}
           </div>
@@ -681,6 +693,7 @@ export default function AddItem() {
                   onClick={() => setShowScanner(true)}
                   className="btn btn-secondary"
                   title={['book', 'comic', 'ebook'].includes(formData.type) ? "Scan ISBN" : "Scan barcode"}
+                  aria-label={['book', 'comic', 'ebook'].includes(formData.type) ? "Scan ISBN" : "Scan barcode"}
                 >
                   <FiCamera className="w-5 h-5" />
                 </button>
@@ -746,6 +759,7 @@ export default function AddItem() {
                   onClick={() => setShowScanner(true)}
                   className="btn btn-secondary"
                   title="Scan barcode"
+                  aria-label="Scan barcode"
                 >
                   <FiCamera className="w-5 h-5" />
                 </button>
@@ -922,6 +936,7 @@ export default function AddItem() {
                   onClick={() => setShowScanner(true)}
                   className="btn btn-secondary"
                   title="Scan barcode"
+                  aria-label="Scan barcode"
                 >
                   <FiCamera className="w-5 h-5" />
                 </button>
@@ -976,7 +991,7 @@ export default function AddItem() {
                 onChange={(e) => setCreatorInput({ ...creatorInput, role: e.target.value })}
                 className="input w-40"
               >
-                {creatorRoles.map((role) => (
+                {CREATOR_ROLES.map((role) => (
                   <option key={role.value} value={role.value}>
                     {role.label}
                   </option>
@@ -1249,56 +1264,10 @@ export default function AddItem() {
             <label className="label">Tags</label>
             
             {/* Quick Tag Suggestions */}
-            <div className="mb-3">
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Quick Add:</p>
-              <div className="flex flex-wrap gap-2">
-                {/* Language Tags */}
-                {['English', 'Dutch', 'French', 'German', 'Spanish', 'Italian', 'Japanese'].map(lang => (
-                  <button
-                    key={lang}
-                    type="button"
-                    onClick={() => {
-                      if (!formData.tags.includes(lang)) {
-                        setFormData({ ...formData, tags: [...formData.tags, lang] });
-                        toast.success(`Added ${lang} tag`);
-                      }
-                    }}
-                    className={`px-2 py-1 text-xs rounded-full transition-colors ${
-                      formData.tags.includes(lang)
-                        ? 'bg-blue-500 text-white cursor-not-allowed'
-                        : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-blue-100 dark:hover:bg-blue-900'
-                    }`}
-                    disabled={formData.tags.includes(lang)}
-                  >
-                    {lang} {formData.tags.includes(lang) ? '✓' : null}
-                  </button>
-                ))}
-              </div>
-              
-              <div className="flex flex-wrap gap-2 mt-2">
-                {/* Genre/Category Tags */}
-                {['Fiction', 'Non-Fiction', 'Biography', 'Science Fiction', 'Fantasy', 'Mystery', 'Horror', 'Romance', 'Thriller', 'Comedy', 'Drama', 'Action'].map(genre => (
-                  <button
-                    key={genre}
-                    type="button"
-                    onClick={() => {
-                      if (!formData.tags.includes(genre)) {
-                        setFormData({ ...formData, tags: [...formData.tags, genre] });
-                        toast.success(`Added ${genre} tag`);
-                      }
-                    }}
-                    className={`px-2 py-1 text-xs rounded-full transition-colors ${
-                      formData.tags.includes(genre)
-                        ? 'bg-green-500 text-white cursor-not-allowed'
-                        : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-green-100 dark:hover:bg-green-900'
-                    }`}
-                    disabled={formData.tags.includes(genre)}
-                  >
-                    {genre} {formData.tags.includes(genre) ? '✓' : null}
-                  </button>
-                ))}
-              </div>
-            </div>
+            <QuickTagSuggestions
+              tags={formData.tags}
+              onChange={(tags) => setFormData({ ...formData, tags })}
+            />
 
             {/* Custom Tag Input */}
             <div className="flex gap-2 mb-2">
@@ -1367,14 +1336,24 @@ export default function AddItem() {
         </div>
 
         {/* Actions */}
-        <div className="flex gap-3">
-          <button type="submit" className="btn btn-primary flex-1">
-            Add Item
+        <div className="flex gap-3 flex-wrap">
+          <button type="submit" className="btn btn-primary flex-1" disabled={submitting}>
+            {submitting ? 'Adding...' : 'Add Item'}
+          </button>
+          <button
+            type="button"
+            onClick={(e) => handleSubmit(e, true)}
+            className="btn btn-secondary"
+            disabled={submitting}
+            title="Save this item and clear the form for the next one"
+          >
+            {submitting ? 'Adding...' : 'Save & Add Another'}
           </button>
           <button
             type="button"
             onClick={() => navigate('/items')}
             className="btn btn-secondary"
+            disabled={submitting}
           >
             Cancel
           </button>

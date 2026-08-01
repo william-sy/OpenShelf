@@ -1,33 +1,60 @@
 import { useState, useEffect } from 'react';
-import { FiSave, FiPrinter } from 'react-icons/fi';
+import { FiSave, FiPrinter, FiRotateCcw } from 'react-icons/fi';
 import { toast } from 'react-hot-toast';
 import api from '../services/api';
 import ItemLabel from '../components/ItemLabel';
 
+// Common physical label sizes, each a self-consistent bundle (dimensions +
+// QR/cover/font sizes scaled together) rather than just width/height -
+// switching presets shouldn't leave a tiny thermal label with a QR code
+// sized for a full A4 sheet. The old hardcoded default (210x297mm) was
+// framed as "Standard" even though the page's own header promises settings
+// "for your thermal printer" - real thermal label stock is nowhere near
+// A4-sized, so a first-timer accepting the default got a broken print with
+// no explanation why. It's kept here only as the explicit "Full sheet"
+// option, not the implied default.
+const SIZE_PRESETS = {
+  smallThermal: {
+    label: 'Small thermal label (40 × 30mm)',
+    labelWidth: 40, labelHeight: 30, qrSize: 70, coverSize: 26, fontSize: 6,
+  },
+  wideThermal: {
+    label: 'Wide thermal label (62 × 29mm)',
+    labelWidth: 62, labelHeight: 29, qrSize: 65, coverSize: 24, fontSize: 6,
+  },
+  fullSheet: {
+    label: 'Full sheet / A4 (210 × 297mm, laser/inkjet)',
+    labelWidth: 210, labelHeight: 297, qrSize: 180, coverSize: 60, fontSize: 12,
+  },
+};
+
+const DEFAULT_SETTINGS = {
+  baseUrl: '',
+  labelWidth: SIZE_PRESETS.fullSheet.labelWidth,
+  labelHeight: SIZE_PRESETS.fullSheet.labelHeight,
+  qrSize: SIZE_PRESETS.fullSheet.qrSize,
+  coverSize: SIZE_PRESETS.fullSheet.coverSize,
+  fontSize: SIZE_PRESETS.fullSheet.fontSize,
+  orientation: 'portrait',
+  imageDpi: 302,
+  textAlign: 'left',
+  showSpine: false,
+  spineWidth: 10,
+  mirrorLayout: false,
+  showTitle: true,
+  showType: true,
+  showCreators: true,
+  showCover: true,
+  showIsbn: false,
+  showPublisher: false,
+  showYear: false,
+  showLocation: false,
+  showUrl: true,
+};
+
 export default function LabelSettings() {
-  const [settings, setSettings] = useState({
-    baseUrl: '',
-    labelWidth: 210,
-    labelHeight: 297,
-    orientation: 'portrait',
-    qrSize: 180,
-    coverSize: 60,
-    fontSize: 12,
-    imageDpi: 302,
-    textAlign: 'left',
-    showSpine: false,
-    spineWidth: 10,
-    mirrorLayout: false,
-    showTitle: true,
-    showType: true,
-    showCreators: true,
-    showCover: true,
-    showIsbn: false,
-    showPublisher: false,
-    showYear: false,
-    showLocation: false,
-    showUrl: true,
-  });
+  const [settings, setSettings] = useState(DEFAULT_SETTINGS);
+  const [savedSettings, setSavedSettings] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -53,14 +80,14 @@ export default function LabelSettings() {
     try {
       const response = await api.get('/api/settings/labels');
       const data = response.data;
-      setSettings({
+      const loaded = {
         baseUrl: data.baseUrl || window.location.origin,
-        labelWidth: Number(data.labelWidth) || 210,
-        labelHeight: Number(data.labelHeight) || 297,
+        labelWidth: Number(data.labelWidth) || DEFAULT_SETTINGS.labelWidth,
+        labelHeight: Number(data.labelHeight) || DEFAULT_SETTINGS.labelHeight,
         orientation: data.orientation || 'portrait',
-        qrSize: Number(data.qrSize) || 180,
-        coverSize: Number(data.coverSize) || 60,
-        fontSize: Number(data.fontSize) || 12,
+        qrSize: Number(data.qrSize) || DEFAULT_SETTINGS.qrSize,
+        coverSize: Number(data.coverSize) || DEFAULT_SETTINGS.coverSize,
+        fontSize: Number(data.fontSize) || DEFAULT_SETTINGS.fontSize,
         imageDpi: Number(data.imageDpi) || 302,
         textAlign: data.textAlign || 'left',
         showSpine: Boolean(data.showSpine),
@@ -75,7 +102,9 @@ export default function LabelSettings() {
         showYear: Boolean(data.showYear),
         showLocation: Boolean(data.showLocation),
         showUrl: data.showUrl !== undefined ? Boolean(data.showUrl) : true,
-      });
+      };
+      setSettings(loaded);
+      setSavedSettings(loaded);
     } catch (error) {
       console.error('Error loading label settings:', error);
       // Set default baseUrl if loading fails
@@ -107,6 +136,7 @@ export default function LabelSettings() {
     setSaving(true);
     try {
       await api.put('/api/settings/labels', settings);
+      setSavedSettings(settings);
       toast.success('Label settings saved!');
     } catch (error) {
       console.error('Error saving label settings:', error);
@@ -131,6 +161,31 @@ export default function LabelSettings() {
       ...prev,
       [name]: finalValue
     }));
+  };
+
+  const applyPreset = (presetKey) => {
+    const preset = SIZE_PRESETS[presetKey];
+    if (!preset) return;
+    setSettings(prev => ({
+      ...prev,
+      labelWidth: preset.labelWidth,
+      labelHeight: preset.labelHeight,
+      qrSize: preset.qrSize,
+      coverSize: preset.coverSize,
+      fontSize: preset.fontSize,
+    }));
+  };
+
+  const handleResetDefaults = () => {
+    if (!window.confirm('Reset all label settings to defaults? This discards unsaved changes.')) return;
+    setSettings({ ...DEFAULT_SETTINGS, baseUrl: settings.baseUrl });
+    toast.success('Reset to defaults - click Save to apply');
+  };
+
+  const handleRevertToSaved = () => {
+    if (!savedSettings) return;
+    setSettings(savedSettings);
+    toast.success('Reverted to last saved settings');
   };
 
   if (loading) {
@@ -181,6 +236,26 @@ export default function LabelSettings() {
           <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
             Label Dimensions
           </h3>
+
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Quick preset
+            </label>
+            <select
+              onChange={(e) => e.target.value && applyPreset(e.target.value)}
+              defaultValue=""
+              className="input w-full"
+            >
+              <option value="" disabled>Choose a common label size...</option>
+              {Object.entries(SIZE_PRESETS).map(([key, preset]) => (
+                <option key={key} value={key}>{preset.label}</option>
+              ))}
+            </select>
+            <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+              Sets width, height, QR size, cover size, and font size together. You can still fine-tune any value below.
+            </p>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -229,7 +304,7 @@ export default function LabelSettings() {
             </div>
           </div>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
-            Standard UPS label size: 210 × 297mm (A4). Adjust to match your thermal printer's label size.
+            Use a preset above, or enter your label roll/sheet's exact dimensions here. 210 × 297mm is a full A4 sheet (laser/inkjet) - most thermal label rolls are much smaller.
           </p>
         </div>
 
@@ -394,135 +469,152 @@ export default function LabelSettings() {
           </div>
         </div>
 
-        {/* Display Options */}
-        <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
+        {/* Display Options - grouped into 3 subsections instead of one flat
+            8-item list, each exposed as a real <fieldset>/<legend> so the
+            grouping is available to assistive tech, not just visual proximity */}
+        <div className="border-t border-gray-200 dark:border-gray-700 pt-6 space-y-5">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
             What to Show on Label
           </h3>
-          <div className="space-y-3">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                name="showCover"
-                checked={settings.showCover}
-                onChange={handleChange}
-                className="w-4 h-4 text-primary-600 rounded focus:ring-primary-500"
-              />
-              <span className="text-sm text-gray-700 dark:text-gray-300">
-                Show cover image
-              </span>
-            </label>
-            
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                name="showTitle"
-                checked={settings.showTitle}
-                onChange={handleChange}
-                className="w-4 h-4 text-primary-600 rounded focus:ring-primary-500"
-              />
-              <span className="text-sm text-gray-700 dark:text-gray-300">
-                Show title
-              </span>
-            </label>
-            
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                name="showType"
-                checked={settings.showType}
-                onChange={handleChange}
-                className="w-4 h-4 text-primary-600 rounded focus:ring-primary-500"
-              />
-              <span className="text-sm text-gray-700 dark:text-gray-300">
-                Show item type
-              </span>
-            </label>
-            
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                name="showCreators"
-                checked={settings.showCreators}
-                onChange={handleChange}
-                className="w-4 h-4 text-primary-600 rounded focus:ring-primary-500"
-              />
-              <span className="text-sm text-gray-700 dark:text-gray-300">
-                Show creators/authors
-              </span>
-            </label>
-            
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                name="showIsbn"
-                checked={settings.showIsbn}
-                onChange={handleChange}
-                className="w-4 h-4 text-primary-600 rounded focus:ring-primary-500"
-              />
-              <span className="text-sm text-gray-700 dark:text-gray-300">
-                Show ISBN
-              </span>
-            </label>
-            
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                name="showPublisher"
-                checked={settings.showPublisher}
-                onChange={handleChange}
-                className="w-4 h-4 text-primary-600 rounded focus:ring-primary-500"
-              />
-              <span className="text-sm text-gray-700 dark:text-gray-300">
-                Show publisher
-              </span>
-            </label>
-            
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                name="showYear"
-                checked={settings.showYear}
-                onChange={handleChange}
-                className="w-4 h-4 text-primary-600 rounded focus:ring-primary-500"
-              />
-              <span className="text-sm text-gray-700 dark:text-gray-300">
-                Show year
-              </span>
-            </label>
-            
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                name="showLocation"
-                checked={settings.showLocation}
-                onChange={handleChange}
-                className="w-4 h-4 text-primary-600 rounded focus:ring-primary-500"
-              />
-              <span className="text-sm text-gray-700 dark:text-gray-300">
-                Show location
-              </span>
-            </label>
-            
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                name="showUrl"
-                checked={settings.showUrl}
-                onChange={handleChange}
-                className="w-4 h-4 text-primary-600 rounded focus:ring-primary-500"
-              />
-              <span className="text-sm text-gray-700 dark:text-gray-300">
-                Show URL at bottom
-              </span>
-            </label>
-          </div>
+
+          <fieldset>
+            <legend className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-500 mb-2">
+              Core identity
+            </legend>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  name="showCover"
+                  checked={settings.showCover}
+                  onChange={handleChange}
+                  className="w-4 h-4 text-primary-600 rounded focus:ring-primary-500"
+                />
+                <span className="text-sm text-gray-700 dark:text-gray-300">Show cover image</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  name="showTitle"
+                  checked={settings.showTitle}
+                  onChange={handleChange}
+                  className="w-4 h-4 text-primary-600 rounded focus:ring-primary-500"
+                />
+                <span className="text-sm text-gray-700 dark:text-gray-300">Show title</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  name="showType"
+                  checked={settings.showType}
+                  onChange={handleChange}
+                  className="w-4 h-4 text-primary-600 rounded focus:ring-primary-500"
+                />
+                <span className="text-sm text-gray-700 dark:text-gray-300">Show item type</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  name="showCreators"
+                  checked={settings.showCreators}
+                  onChange={handleChange}
+                  className="w-4 h-4 text-primary-600 rounded focus:ring-primary-500"
+                />
+                <span className="text-sm text-gray-700 dark:text-gray-300">Show creators/authors</span>
+              </label>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-500 mb-2">
+              Bibliographic metadata
+            </legend>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  name="showIsbn"
+                  checked={settings.showIsbn}
+                  onChange={handleChange}
+                  className="w-4 h-4 text-primary-600 rounded focus:ring-primary-500"
+                />
+                <span className="text-sm text-gray-700 dark:text-gray-300">Show ISBN</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  name="showPublisher"
+                  checked={settings.showPublisher}
+                  onChange={handleChange}
+                  className="w-4 h-4 text-primary-600 rounded focus:ring-primary-500"
+                />
+                <span className="text-sm text-gray-700 dark:text-gray-300">Show publisher</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  name="showYear"
+                  checked={settings.showYear}
+                  onChange={handleChange}
+                  className="w-4 h-4 text-primary-600 rounded focus:ring-primary-500"
+                />
+                <span className="text-sm text-gray-700 dark:text-gray-300">Show year</span>
+              </label>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-500 mb-2">
+              Footer
+            </legend>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  name="showLocation"
+                  checked={settings.showLocation}
+                  onChange={handleChange}
+                  className="w-4 h-4 text-primary-600 rounded focus:ring-primary-500"
+                />
+                <span className="text-sm text-gray-700 dark:text-gray-300">Show location</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  name="showUrl"
+                  checked={settings.showUrl}
+                  onChange={handleChange}
+                  className="w-4 h-4 text-primary-600 rounded focus:ring-primary-500"
+                />
+                <span className="text-sm text-gray-700 dark:text-gray-300">Show URL at bottom</span>
+              </label>
+            </div>
+          </fieldset>
         </div>
 
         {/* Save Button */}
-        <div className="flex justify-end pt-4">
-          <button 
-            type="submit" 
+        <div className="flex justify-between items-center pt-4 flex-wrap gap-2">
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={handleResetDefaults}
+              className="btn btn-secondary flex items-center gap-2"
+            >
+              <FiRotateCcw className="w-4 h-4" />
+              Reset to Defaults
+            </button>
+            {savedSettings && (
+              <button
+                type="button"
+                onClick={handleRevertToSaved}
+                className="btn btn-secondary flex items-center gap-2"
+              >
+                Revert to Last Saved
+              </button>
+            )}
+          </div>
+          <button
+            type="submit"
             className="btn btn-primary"
             disabled={saving}
           >
